@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VehicleLogger — Тестовый стенд</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--orange:#db6d28;--purple:#bc8cff}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh}
+
+header{background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+header h1{font-size:18px;font-weight:600}
+.status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--red)}
+.dot.on{background:var(--green);box-shadow:0 0 6px var(--green)}
+.info-bar{display:flex;gap:16px;font-size:12px;color:var(--muted);padding:4px 24px;background:rgba(255,255,255,0.02);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.info-bar span{white-space:nowrap}
+.info-bar b{color:var(--text);font-weight:500}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px 24px;max-width:1200px;margin:0 auto}
+@media(max-width:768px){.grid{grid-template-columns:1fr;padding:12px}}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;overflow:hidden}
+.card.full{grid-column:1/-1}
+.card h2{font-size:14px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.card h2 .badge{font-size:11px;padding:1px 8px;border-radius:10px;font-weight:500}
+.badge.ok{background:rgba(63,185,80,0.15);color:var(--green)}
+.badge.fail{background:rgba(248,81,73,0.15);color:var(--red)}
+.badge.wait{background:rgba(210,153,34,0.15);color:var(--yellow)}
+
+canvas{width:100%;height:140px;display:block;border-radius:4px;background:var(--bg);border:1px solid var(--border);margin-bottom:8px}
+
+.values{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;font-size:12px}
+.val{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:6px 8px;text-align:center}
+.val .label{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.5px}
+.val .num{font-family:'SF Mono',Consolas,monospace;font-size:16px;font-weight:600;margin-top:2px}
+
+.gps-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.gps-grid .val{text-align:left}
+.gps-grid .val .num{font-size:14px}
+
+.sys-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sys-grid .val{text-align:left}
+
+.rssi-bar{height:4px;border-radius:2px;background:var(--border);margin-top:4px;overflow:hidden}
+.rssi-bar .fill{height:100%;border-radius:2px;transition:width 0.3s}
+
+.can-log{font-family:'SF Mono',Consolas,monospace;font-size:12px;max-height:200px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px}
+.can-row{display:flex;gap:12px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+.can-row:last-child{border-bottom:none}
+.can-id{color:var(--accent);min-width:60px}
+.can-dlc{color:var(--muted);min-width:30px}
+.can-data{color:var(--green)}
+.can-ts{color:var(--muted);margin-left:auto;font-size:11px}
+
+.empty{color:var(--muted);font-style:italic;font-size:13px;padding:16px;text-align:center}
+
+.temp-row{margin-top:8px;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.temp-row .num{color:var(--text);font-family:monospace;font-weight:600}
+
+.sat-layout{display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start}
+@media(max-width:768px){.sat-layout{grid-template-columns:1fr}}
+#skyPlot{width:260px;height:260px;border:1px solid var(--border);border-radius:4px;background:var(--bg)}
+#snrChart{width:100%;height:260px;border:1px solid var(--border);border-radius:4px;background:var(--bg)}
+
+.sat-legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--muted)}
+.sat-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;vertical-align:middle}
+.sat-summary{font-size:12px;color:var(--muted);margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+.sat-summary b{color:var(--text);font-weight:500}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>VehicleLogger — Тестовый стенд</h1>
+  <div class="status">
+    <span class="dot" id="wsDot"></span>
+    <span id="wsStatus">Подключение...</span>
+  </div>
+</header>
+
+<div class="info-bar">
+  <span>IP: <b id="ipAddr">—</b></span>
+  <span>Uptime: <b id="uptime">—</b></span>
+  <span>Heap: <b id="heap">—</b></span>
+  <span>RSSI: <b id="rssiVal">—</b></span>
+  <span>WS: <b id="wsClients">—</b></span>
+</div>
+
+<div class="grid">
+
+  <!-- Акселерометр -->
+  <div class="card">
+    <h2>Акселерометр <span class="badge" id="imuBadge">—</span></h2>
+    <canvas id="accelChart"></canvas>
+    <div class="values">
+      <div class="val"><div class="label">X (g)</div><div class="num" id="ax" style="color:#58a6ff">—</div></div>
+      <div class="val"><div class="label">Y (g)</div><div class="num" id="ay" style="color:#3fb950">—</div></div>
+      <div class="val"><div class="label">Z (g)</div><div class="num" id="az" style="color:#f85149">—</div></div>
+    </div>
+    <div class="temp-row">Температура: <span class="num" id="imuTemp">—</span> °C</div>
+  </div>
+
+  <!-- Гироскоп -->
+  <div class="card">
+    <h2>Гироскоп</h2>
+    <canvas id="gyroChart"></canvas>
+    <div class="values">
+      <div class="val"><div class="label">X (°/s)</div><div class="num" id="gx" style="color:#58a6ff">—</div></div>
+      <div class="val"><div class="label">Y (°/s)</div><div class="num" id="gy" style="color:#3fb950">—</div></div>
+      <div class="val"><div class="label">Z (°/s)</div><div class="num" id="gz" style="color:#f85149">—</div></div>
+    </div>
+  </div>
+
+  <!-- GPS -->
+  <div class="card">
+    <h2>GPS (NEO-M8N) <span class="badge" id="gpsBadge">—</span></h2>
+    <div class="gps-grid">
+      <div class="val"><div class="label">Широта</div><div class="num" id="lat">—</div></div>
+      <div class="val"><div class="label">Долгота</div><div class="num" id="lng">—</div></div>
+      <div class="val"><div class="label">Скорость</div><div class="num"><span id="gpsSpeed">—</span> км/ч</div></div>
+      <div class="val"><div class="label">Высота</div><div class="num"><span id="gpsAlt">—</span> м</div></div>
+      <div class="val"><div class="label">Спутники</div><div class="num" id="gpsSats">—</div></div>
+      <div class="val"><div class="label">NMEA пакетов</div><div class="num" id="gpsChk">—</div></div>
+    </div>
+  </div>
+
+  <!-- Система -->
+  <div class="card">
+    <h2>Система</h2>
+    <div class="sys-grid">
+      <div class="val">
+        <div class="label">WiFi RSSI</div>
+        <div class="num" id="rssiNum">— dBm</div>
+        <div class="rssi-bar"><div class="fill" id="rssiFill" style="width:0;background:var(--green)"></div></div>
+      </div>
+      <div class="val"><div class="label">Free Heap</div><div class="num" id="heapNum">—</div></div>
+      <div class="val"><div class="label">Uptime</div><div class="num" id="uptimeNum">—</div></div>
+      <div class="val"><div class="label">WS клиенты</div><div class="num" id="clientsNum">—</div></div>
+    </div>
+  </div>
+
+  <!-- Спутники -->
+  <div class="card full">
+    <h2>Спутники
+      <span class="badge wait" id="satBadge">—</span>
+      <div class="sat-summary">
+        <span>Видно: <b id="satTotal">0</b></span>
+        <span>Отслеж.: <b id="satTracked">0</b></span>
+        <span>GPS: <b id="cntGps">0</b></span>
+        <span>GLONASS: <b id="cntGlo">0</b></span>
+        <span>Galileo: <b id="cntGal">0</b></span>
+        <span>BeiDou: <b id="cntBei">0</b></span>
+      </div>
+    </h2>
+    <div class="sat-legend">
+      <span><i style="background:#58a6ff"></i>GPS</span>
+      <span><i style="background:#f85149"></i>GLONASS</span>
+      <span><i style="background:#3fb950"></i>Galileo</span>
+      <span><i style="background:#d29922"></i>BeiDou</span>
+      <span><i style="background:#8b949e"></i>SBAS</span>
+    </div>
+    <div class="sat-layout">
+      <canvas id="skyPlot" width="260" height="260"></canvas>
+      <canvas id="snrChart" height="260"></canvas>
+    </div>
+  </div>
+
+  <!-- CAN -->
+  <div class="card full">
+    <h2>CAN Bus (WCMCU-230) <span class="badge" id="canBadge">—</span> <span style="font-weight:400;font-size:12px;color:var(--muted);margin-left:auto" id="canCount">Фреймов: 0</span></h2>
+    <div class="can-log" id="canLog">
+      <div class="empty">Нет CAN-фреймов (нормально без CAN-шины)</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── Realtime Chart ─────────────────────────────
+
+class RealtimeChart {
+  constructor(canvasId, options = {}) {
+    this.canvas = document.getElementById(canvasId);
+    this.ctx = this.canvas.getContext('2d');
+    this.series = options.series || [{ color: '#58a6ff' }];
+    this.maxPoints = options.maxPoints || 150;
+    this.minY = options.minY ?? null;
+    this.maxY = options.maxY ?? null;
+    this.data = this.series.map(() => []);
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+  }
+
+  resize() {
+    const rect = this.canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    this.canvas.width = rect.width * dpr;
+    this.canvas.height = rect.height * dpr;
+    this.ctx.scale(dpr, dpr);
+    this.w = rect.width;
+    this.h = rect.height;
+    this.draw();
+  }
+
+  push(values) {
+    for (let i = 0; i < this.series.length; i++) {
+      this.data[i].push(values[i] ?? 0);
+      if (this.data[i].length > this.maxPoints) this.data[i].shift();
+    }
+    this.draw();
+  }
+
+  draw() {
+    const ctx = this.ctx;
+    const w = this.w, h = this.h;
+    const pad = { top: 8, right: 8, bottom: 4, left: 40 };
+    const cw = w - pad.left - pad.right;
+    const ch = h - pad.top - pad.bottom;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Compute Y range
+    let allVals = this.data.flat();
+    if (allVals.length === 0) return;
+
+    let minV = this.minY ?? Math.min(...allVals);
+    let maxV = this.maxY ?? Math.max(...allVals);
+    if (minV === maxV) { minV -= 1; maxV += 1; }
+    const rangeV = maxV - minV;
+    const margin = rangeV * 0.1;
+    if (this.minY === null) minV -= margin;
+    if (this.maxY === null) maxV += margin;
+
+    // Grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    const gridLines = 4;
+    for (let i = 0; i <= gridLines; i++) {
+      const y = pad.top + (ch / gridLines) * i;
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(w - pad.right, y);
+      ctx.stroke();
+
+      // Label
+      const val = maxV - ((maxV - minV) / gridLines) * i;
+      ctx.fillStyle = '#8b949e';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(val.toFixed(1), pad.left - 4, y + 3);
+    }
+
+    // Zero line
+    if (minV < 0 && maxV > 0) {
+      const zeroY = pad.top + ch * (1 - (0 - minV) / (maxV - minV));
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(pad.left, zeroY);
+      ctx.lineTo(w - pad.right, zeroY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Lines
+    for (let s = 0; s < this.series.length; s++) {
+      const d = this.data[s];
+      if (d.length < 2) continue;
+
+      ctx.strokeStyle = this.series[s].color;
+      ctx.lineWidth = 1.5;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+
+      for (let i = 0; i < d.length; i++) {
+        const x = pad.left + (cw / (this.maxPoints - 1)) * (this.maxPoints - d.length + i);
+        const y = pad.top + ch * (1 - (d[i] - minV) / (maxV - minV));
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  }
+}
+
+// ─── Charts ─────────────────────────────────────
+
+const accelChart = new RealtimeChart('accelChart', {
+  series: [{ color: '#58a6ff' }, { color: '#3fb950' }, { color: '#f85149' }],
+  maxPoints: 150
+});
+
+const gyroChart = new RealtimeChart('gyroChart', {
+  series: [{ color: '#58a6ff' }, { color: '#3fb950' }, { color: '#f85149' }],
+  maxPoints: 150
+});
+
+// ─── DOM Helpers ────────────────────────────────
+
+const $ = id => document.getElementById(id);
+
+function setBadge(id, ok, textOk = 'OK', textFail = 'FAIL') {
+  const el = $(id);
+  el.textContent = ok ? textOk : textFail;
+  el.className = 'badge ' + (ok ? 'ok' : 'fail');
+}
+
+function formatUptime(sec) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function rssiPercent(rssi) {
+  return Math.max(0, Math.min(100, (rssi + 100) * 2));
+}
+
+function rssiColor(rssi) {
+  if (rssi > -50) return 'var(--green)';
+  if (rssi > -70) return 'var(--yellow)';
+  return 'var(--red)';
+}
+
+// ─── Satellite Charts ───────────────────────────
+
+const SAT_COLORS = ['#58a6ff','#f85149','#3fb950','#d29922','#8b949e','#8b949e'];
+
+function drawSkyPlot(satellites) {
+  const c = document.getElementById('skyPlot');
+  const ctx = c.getContext('2d');
+  const s = 260, cx = s/2, cy = s/2, r = s/2 - 24;
+
+  ctx.clearRect(0, 0, s, s);
+
+  // Круги высоты (0°, 30°, 60°)
+  [0, 30, 60].forEach(elev => {
+    const cr = r * (90 - elev) / 90;
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+    ctx.stroke();
+  });
+  // Центр (зенит)
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Линии N-S, E-W
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
+  ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
+  ctx.stroke();
+
+  // Подписи сторон света
+  ctx.fillStyle = '#8b949e';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('N', cx, cy - r - 12);
+  ctx.fillText('S', cx, cy + r + 12);
+  ctx.fillText('E', cx + r + 12, cy);
+  ctx.fillText('W', cx - r - 12, cy);
+
+  // Подписи высот
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.font = '9px monospace';
+  ctx.fillText('60°', cx + 14, cy - r * 60/90 + 1);
+  ctx.fillText('30°', cx + 14, cy - r * 30/90 + 1);
+
+  // Спутники
+  satellites.forEach(sat => {
+    const azRad = (sat.azim - 90) * Math.PI / 180;
+    const sr = r * (90 - sat.elev) / 90;
+    const x = cx + sr * Math.cos(azRad);
+    const y = cy + sr * Math.sin(azRad);
+    const col = SAT_COLORS[sat.con] || SAT_COLORS[5];
+    const tracking = sat.snr > 0;
+
+    // Точка
+    ctx.globalAlpha = tracking ? 0.9 : 0.3;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(x, y, tracking ? 5 : 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // PRN
+    ctx.globalAlpha = tracking ? 0.8 : 0.3;
+    ctx.fillStyle = '#e6edf3';
+    ctx.font = '8px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(sat.prn, x, y - 6);
+    ctx.globalAlpha = 1;
+  });
+}
+
+function drawSnrChart(satellites) {
+  const c = document.getElementById('snrChart');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = c.getBoundingClientRect();
+  const w = rect.width, h = 260;
+  c.width = w * dpr;
+  c.height = h * dpr;
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const sorted = [...satellites].sort((a, b) => b.snr - a.snr);
+  if (sorted.length === 0) {
+    ctx.fillStyle = '#8b949e';
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Нет данных о спутниках', w/2, h/2);
+    return;
+  }
+
+  const pad = { left: 52, right: 10, top: 6, bottom: 16 };
+  const barH = Math.min(16, (h - pad.top - pad.bottom) / sorted.length);
+  const maxSnr = 50;
+  const barW = w - pad.left - pad.right;
+
+  // Шкала SNR
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.fillStyle = '#8b949e';
+  ctx.font = '9px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  [0, 10, 20, 30, 40, 50].forEach(v => {
+    const x = pad.left + (v / maxSnr) * barW;
+    ctx.beginPath();
+    ctx.moveTo(x, pad.top);
+    ctx.lineTo(x, pad.top + sorted.length * barH);
+    ctx.stroke();
+    ctx.fillText(v, x, pad.top + sorted.length * barH + 2);
+  });
+
+  sorted.forEach((sat, i) => {
+    const y = pad.top + i * barH;
+    const bw = Math.max(1, (sat.snr / maxSnr) * barW);
+    const col = SAT_COLORS[sat.con] || SAT_COLORS[5];
+
+    // ��ар
+    ctx.globalAlpha = sat.snr > 0 ? 0.7 : 0.15;
+    ctx.fillStyle = col;
+    ctx.fillRect(pad.left, y + 1, bw, barH - 2);
+    ctx.globalAlpha = 1;
+
+    // PRN слева
+    ctx.fillStyle = sat.snr > 0 ? '#e6edf3' : '#8b949e';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(sat.prn, pad.left - 4, y + barH / 2);
+
+    // SNR справа от бара
+    if (sat.snr > 0) {
+      ctx.fillStyle = '#e6edf3';
+      ctx.textAlign = 'left';
+      ctx.fillText(sat.snr, pad.left + bw + 4, y + barH / 2);
+    }
+  });
+}
+
+function updateSatCounts(satellites) {
+  const counts = [0, 0, 0, 0, 0, 0];
+  let tracked = 0;
+  satellites.forEach(s => {
+    counts[s.con]++;
+    if (s.snr > 0) tracked++;
+  });
+  $('satTotal').textContent = satellites.length;
+  $('satTracked').textContent = tracked;
+  $('cntGps').textContent = counts[0];
+  $('cntGlo').textContent = counts[1];
+  $('cntGal').textContent = counts[2];
+  $('cntBei').textContent = counts[3];
+
+  const el = $('satBadge');
+  if (satellites.length === 0) { el.textContent = 'NO DATA'; el.className = 'badge fail'; }
+  else if (tracked > 3) { el.textContent = tracked + ' tracked'; el.className = 'badge ok'; }
+  else { el.textContent = tracked + ' tracked'; el.className = 'badge wait'; }
+}
+
+// Поллинг спутников (1 раз в 2 сек — данные GSV обнов��яются медленно)
+setInterval(() => {
+  fetch('/api/satellites')
+    .then(r => r.json())
+    .then(data => {
+      drawSkyPlot(data);
+      drawSnrChart(data);
+      updateSatCounts(data);
+    })
+    .catch(() => {});
+}, 2000);
+
+// ─── CAN Log ────────────────────────────────────
+
+let canFrames = [];
+
+function updateCanLog(frames) {
+  const el = $('canLog');
+  if (frames === 0) return;
+
+  // Загрузить лог с сервера
+  fetch('/api/canlog')
+    .then(r => r.json())
+    .then(data => {
+      if (data.length === 0) return;
+      el.innerHTML = data.map(f => `
+        <div class="can-row">
+          <span class="can-id">0x${f.id.toString(16).toUpperCase().padStart(3,'0')}</span>
+          <span class="can-dlc">[${f.dlc}]</span>
+          <span class="can-data">${f.data.toUpperCase()}</span>
+          <span class="can-ts">${(f.ts/1000).toFixed(1)}s</span>
+        </div>
+      `).join('');
+    })
+    .catch(() => {});
+}
+
+// ─── WebSocket ──────────────────────────────────
+
+let ws;
+let wsReconnectTimer;
+let lastCanFrameCount = 0;
+
+function connectWS() {
+  const host = window.location.hostname;
+  ws = new WebSocket(`ws://${host}/ws`);
+
+  ws.onopen = () => {
+    $('wsDot').classList.add('on');
+    $('wsStatus').textContent = 'Подключено';
+    $('ipAddr').textContent = host;
+  };
+
+  ws.onclose = () => {
+    $('wsDot').classList.remove('on');
+    $('wsStatus').textContent = 'Переподключение...';
+    clearTimeout(wsReconnectTimer);
+    wsReconnectTimer = setTimeout(connectWS, 2000);
+  };
+
+  ws.onerror = () => ws.close();
+
+  ws.onmessage = (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      update(d);
+    } catch(err) {}
+  };
+}
+
+function update(d) {
+  // IMU
+  if (d.imu) {
+    setBadge('imuBadge', d.imu.ok);
+    $('ax').textContent = d.imu.ax.toFixed(2);
+    $('ay').textContent = d.imu.ay.toFixed(2);
+    $('az').textContent = d.imu.az.toFixed(2);
+    $('gx').textContent = d.imu.gx.toFixed(1);
+    $('gy').textContent = d.imu.gy.toFixed(1);
+    $('gz').textContent = d.imu.gz.toFixed(1);
+    $('imuTemp').textContent = d.imu.temp.toFixed(1);
+    accelChart.push([d.imu.ax, d.imu.ay, d.imu.az]);
+    gyroChart.push([d.imu.gx, d.imu.gy, d.imu.gz]);
+  }
+
+  // GPS
+  if (d.gps) {
+    if (d.gps.ok) {
+      setBadge('gpsBadge', d.gps.fix, 'FIX', 'NO FIX');
+      if (!d.gps.fix) $('gpsBadge').className = 'badge wait';
+    } else {
+      setBadge('gpsBadge', false, 'OK', 'NO DATA');
+    }
+    $('lat').textContent = d.gps.fix ? d.gps.lat.toFixed(6) : '—';
+    $('lng').textContent = d.gps.fix ? d.gps.lng.toFixed(6) : '—';
+    $('gpsSpeed').textContent = d.gps.speed.toFixed(1);
+    $('gpsAlt').textContent = d.gps.alt;
+    $('gpsSats').textContent = d.gps.sats;
+    $('gpsChk').textContent = d.gps.chk;
+  }
+
+  // CAN
+  if (d.can) {
+    setBadge('canBadge', d.can.ok, 'INIT OK', 'INIT FAIL');
+    $('canCount').textContent = `Фреймов: ${d.can.frames}`;
+    if (d.can.frames > lastCanFrameCount) {
+      updateCanLog(d.can.frames);
+      lastCanFrameCount = d.can.frames;
+    }
+  }
+
+  // System
+  if (d.sys) {
+    const rssi = d.sys.rssi;
+    $('rssiVal').textContent = rssi + ' dBm';
+    $('rssiNum').textContent = rssi + ' dBm';
+    $('rssiFill').style.width = rssiPercent(rssi) + '%';
+    $('rssiFill').style.background = rssiColor(rssi);
+    $('heap').textContent = (d.sys.heap / 1024).toFixed(0) + ' KB';
+    $('heapNum').textContent = (d.sys.heap / 1024).toFixed(0) + ' KB';
+    $('uptime').textContent = formatUptime(d.sys.uptime);
+    $('uptimeNum').textContent = formatUptime(d.sys.uptime);
+    $('wsClients').textContent = d.sys.clients;
+    $('clientsNum').textContent = d.sys.clients;
+  }
+}
+
+// ─── Init ───────────────────────────────────────
+
+connectWS();
+</script>
+</body>
+</html>
