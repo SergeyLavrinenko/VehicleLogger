@@ -1,0 +1,16 @@
+# Claude Code local settings (per-user, not shared)
+.claude/settings.local.json
+
+# PlatformIO
+firmware/.pio/
+firmware/.vscode/
+firmware-test/.pio/
+firmware-test/.vscode/
+
+# Build artifacts
+firmware/build/
+
+# Secrets
+firmware/include/secrets.h
+firmware/include/config.h
+firmware-test/include/config.h
