@@ -16,6 +16,7 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
+#include <WiFiMulti.h>
 #include <Wire.h>
 #include <LittleFS.h>
 #include <ESPAsyncWebServer.h>
@@ -23,9 +24,12 @@
 #include <driver/twai.h>
 #include <TinyGPSPlus.h>
 #include "config.h"
+#include "j1939.h"
+#include "obd2.h"
 
 // ─── Объекты ───────────────────────────────────
 
+WiFiMulti wifiMulti;
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 HardwareSerial gpsSerial(2);
@@ -33,6 +37,11 @@ TinyGPSPlus gps;
 
 unsigned long lastWsSend = 0;
 bool canInitOk = false;
+int canBaudKbit = 0;
+enum CanProto { PROTO_UNKNOWN = 0, PROTO_J1939 = 1, PROTO_OBD2 = 2 };
+CanProto canProto = PROTO_UNKNOWN;
+uint32_t protoDetectDeadline = 0;
+VehicleData vehicle;
 
 // ─── Данные датчиков ───────────────────────────
 
@@ -351,20 +360,86 @@ void readGPS() {
 
 // ─── CAN ───────────────────────────────────────
 
-void initCAN() {
-  twai_general_config_t g = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX_PIN, CAN_RX_PIN, TWAI_MODE_LISTEN_ONLY);
-  twai_timing_config_t t = TWAI_TIMING_CONFIG_500KBITS();
+static bool installCAN(int kbit, twai_mode_t mode) {
+  twai_general_config_t g = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX_PIN, CAN_RX_PIN, mode);
   twai_filter_config_t f = TWAI_FILTER_CONFIG_ACCEPT_ALL();
-
-  if (twai_driver_install(&g, &t, &f) == ESP_OK && twai_start() == ESP_OK) {
-    canInitOk = true;
-    Serial.println("[CAN] TWAI OK (listen-only, 500 kbit/s)");
+  esp_err_t err;
+  if (kbit == 250) {
+    twai_timing_config_t t = TWAI_TIMING_CONFIG_250KBITS();
+    err = twai_driver_install(&g, &t, &f);
   } else {
-    Serial.println("[CAN] TWAI init FAIL");
+    twai_timing_config_t t = TWAI_TIMING_CONFIG_500KBITS();
+    err = twai_driver_install(&g, &t, &f);
+  }
+  if (err != ESP_OK) return false;
+  if (twai_start() != ESP_OK) { twai_driver_uninstall(); return false; }
+  return true;
+}
+
+void initCAN() {
+  j1939Init(&vehicle);
+  obd2Init(&vehicle);
+  if (installCAN(500, TWAI_MODE_LISTEN_ONLY)) {
+    canBaudKbit = 500;
+    canInitOk = true;
+    Serial.println("[CAN] TWAI OK (listen-only, 500 kbit/s) - probing...");
+  } else {
+    Serial.println("[CAN] TWAI install FAIL @ 500");
+  }
+}
+
+static void maybeSwitchBaud() {
+  static uint32_t startMs = 0;
+  static bool switched = false;
+  if (startMs == 0) startMs = millis();
+  if (switched || !canInitOk) return;
+  if (sensorData.framesTotal > 0) { switched = true; return; }
+  if (millis() - startMs < 3000) return;
+
+  Serial.println("[CAN] No traffic @ 500 - switching to 250 kbit/s");
+  twai_stop();
+  twai_driver_uninstall();
+  if (installCAN(250, TWAI_MODE_LISTEN_ONLY)) {
+    canBaudKbit = 250;
+    canInitOk = true;
+    Serial.println("[CAN] TWAI OK (listen-only, 250 kbit/s)");
+  } else {
+    canInitOk = false;
+    canBaudKbit = 0;
+    Serial.println("[CAN] TWAI install FAIL @ 250");
+  }
+  switched = true;
+}
+
+static void maybeDetectProtocol() {
+  if (canProto != PROTO_UNKNOWN || !canInitOk) return;
+  if (vehicle.pgnKnownCount > 0) {
+    canProto = PROTO_J1939;
+    Serial.println("[PROTO] Detected: J1939 (listen-only)");
+    return;
+  }
+  if (protoDetectDeadline == 0) {
+    protoDetectDeadline = millis() + 3000;
+    return;
+  }
+  if (millis() < protoDetectDeadline) return;
+
+  canProto = PROTO_OBD2;
+  Serial.printf("[PROTO] J1939 not found -> OBD-II. Reinstall NORMAL @ %d kbit/s\n", canBaudKbit);
+  twai_stop();
+  twai_driver_uninstall();
+  if (installCAN(canBaudKbit, TWAI_MODE_NORMAL)) {
+    Serial.println("[CAN] TWAI OK (normal, OBD-II queries)");
+    obd2Enable(true);
+  } else {
+    canInitOk = false;
+    Serial.println("[CAN] TWAI install FAIL normal");
   }
 }
 
 void readCAN() {
+  maybeSwitchBaud();
+  maybeDetectProtocol();
   if (!canInitOk) return;
 
   twai_message_t msg;
@@ -373,6 +448,12 @@ void readCAN() {
     sensorData.lastId = msg.identifier;
     sensorData.lastDlc = msg.data_length_code;
     memcpy(sensorData.lastData, msg.data, 8);
+
+    if (msg.extd) {
+      j1939Decode(msg.identifier, msg.data, msg.data_length_code);
+    } else {
+      obd2HandleResponse(msg.identifier, msg.data, msg.data_length_code);
+    }
 
     // Добавить в лог
     canLog[canLogIndex].id = msg.identifier;
@@ -409,6 +490,42 @@ void buildJson(JsonDocument& doc) {
   JsonObject can = doc["can"].to<JsonObject>();
   can["ok"] = canInitOk;
   can["frames"] = sensorData.framesTotal;
+  can["baud"] = canBaudKbit;
+  can["proto"] = (canProto == PROTO_J1939) ? "J1939" : (canProto == PROTO_OBD2) ? "OBD-II" : "unknown";
+  can["obd2Responses"] = obd2ResponsesCount();
+
+  JsonObject veh = doc["vehicle"].to<JsonObject>();
+  auto stale = [](uint32_t ts, uint32_t t) { return ts == 0 || (millis() - ts) > t; };
+  veh["rpm"] = round(vehicle.rpm * 10) / 10.0;
+  veh["rpm_stale"] = stale(vehicle.ts_rpm, 2000);
+  veh["speed"] = round(vehicle.speed * 10) / 10.0;
+  veh["speed_stale"] = stale(vehicle.ts_speed, 3000);
+  veh["coolant"] = round(vehicle.coolantTemp * 10) / 10.0;
+  veh["coolant_stale"] = stale(vehicle.ts_coolant, 5000);
+  veh["oil"] = round(vehicle.oilPressure);
+  veh["oil_stale"] = stale(vehicle.ts_oil, 5000);
+  veh["fuel"] = round(vehicle.fuelLevel * 10) / 10.0;
+  veh["fuel_stale"] = stale(vehicle.ts_fuel, 5000);
+  veh["voltage"] = round(vehicle.batteryVoltage * 100) / 100.0;
+  veh["voltage_stale"] = stale(vehicle.ts_voltage, 5000);
+  veh["fuelRate"] = round(vehicle.fuelRate * 10) / 10.0;
+  veh["fuelRate_stale"] = stale(vehicle.ts_fuelRate, 5000);
+  veh["load"] = round(vehicle.engineLoad);
+  veh["load_stale"] = stale(vehicle.ts_load, 2000);
+  veh["distance"] = vehicle.totalDistance;
+  veh["distance_stale"] = stale(vehicle.ts_distance, 10000);
+  veh["hours"] = round(vehicle.engineHours * 10) / 10.0;
+  veh["hours_stale"] = stale(vehicle.ts_hours, 10000);
+  veh["pgnKnown"] = vehicle.pgnKnownCount;
+  veh["pgnUnknown"] = vehicle.pgnUnknownCount;
+  veh["lastPgn"] = vehicle.lastPgnReceived;
+  JsonArray dtcs = veh["dtcs"].to<JsonArray>();
+  for (int i = 0; i < vehicle.dtcCount; i++) {
+    JsonObject dtc = dtcs.add<JsonObject>();
+    dtc["spn"] = vehicle.dtcs[i].spn;
+    dtc["fmi"] = vehicle.dtcs[i].fmi;
+    dtc["oc"] = vehicle.dtcs[i].oc;
+  }
 
   JsonObject sys = doc["sys"].to<JsonObject>();
   sys["rssi"] = WiFi.RSSI();
@@ -509,14 +626,20 @@ void handleGsvDebug(AsyncWebServerRequest* request) {
 // ─── WiFi ──────────────────────────────────────
 
 void initWiFi() {
-  Serial.print("[WiFi] Подключение к ");
-  Serial.println(WIFI_SSID);
+  struct Net { const char* ssid; const char* pass; };
+  static const Net nets[] = { WIFI_NETWORKS };
+  const size_t netsCount = sizeof(nets) / sizeof(nets[0]);
+
+  Serial.print("[WiFi] Networks registered:");
+  for (size_t i = 0; i < netsCount; i++) {
+    wifiMulti.addAP(nets[i].ssid, nets[i].pass);
+    Serial.print(" "); Serial.print(nets[i].ssid);
+  }
+  Serial.println();
 
   WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+  while (wifiMulti.run() != WL_CONNECTED && attempts < 60) {
     delay(500);
     Serial.print(".");
     attempts++;
@@ -524,13 +647,11 @@ void initWiFi() {
   Serial.println();
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("[WiFi] IP: ");
-    Serial.println(WiFi.localIP());
-    Serial.print("[WiFi] RSSI: ");
-    Serial.print(WiFi.RSSI());
-    Serial.println(" dBm");
+    Serial.print("[WiFi] Connected to: "); Serial.println(WiFi.SSID());
+    Serial.print("[WiFi] IP: ");    Serial.println(WiFi.localIP());
+    Serial.print("[WiFi] RSSI: ");  Serial.print(WiFi.RSSI()); Serial.println(" dBm");
   } else {
-    Serial.println("[WiFi] FAIL — перезагрузка через 5 сек...");
+    Serial.println("[WiFi] FAIL - перезагрузка через 5 сек...");
     delay(5000);
     ESP.restart();
   }
@@ -554,6 +675,25 @@ void initServer() {
 
   server.on("/api/satellites", HTTP_GET, handleSatellites);
   server.on("/api/canlog", HTTP_GET, handleCanLog);
+  server.on("/api/vehicle", HTTP_GET, [](AsyncWebServerRequest* request) {
+    JsonDocument doc;
+    JsonObject veh = doc.to<JsonObject>();
+    veh["rpm"] = round(vehicle.rpm * 10) / 10.0;
+    veh["speed"] = round(vehicle.speed * 10) / 10.0;
+    veh["coolant"] = round(vehicle.coolantTemp * 10) / 10.0;
+    veh["oil"] = round(vehicle.oilPressure);
+    veh["fuel"] = round(vehicle.fuelLevel * 10) / 10.0;
+    veh["voltage"] = round(vehicle.batteryVoltage * 100) / 100.0;
+    veh["fuelRate"] = round(vehicle.fuelRate * 10) / 10.0;
+    veh["load"] = round(vehicle.engineLoad);
+    veh["distance"] = vehicle.totalDistance;
+    veh["hours"] = round(vehicle.engineHours * 10) / 10.0;
+    veh["pgnKnown"] = vehicle.pgnKnownCount;
+    veh["pgnUnknown"] = vehicle.pgnUnknownCount;
+    veh["lastPgn"] = vehicle.lastPgnReceived;
+    String json; serializeJson(doc, json);
+    request->send(200, "application/json", json);
+  });
   server.on("/api/gsv-debug", HTTP_GET, handleGsvDebug);
 
   server.on("/api/data", HTTP_GET, [](AsyncWebServerRequest* request) {
@@ -594,6 +734,7 @@ void loop() {
   readIMU();
   readGPS();
   readCAN();
+  obd2Tick();
 
   if (millis() - lastWsSend >= WS_UPDATE_MS) {
     lastWsSend = millis();

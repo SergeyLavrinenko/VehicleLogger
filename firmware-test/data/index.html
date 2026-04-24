@@ -68,6 +68,27 @@ canvas{width:100%;height:140px;display:block;border-radius:4px;background:var(--
 .sat-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;vertical-align:middle}
 .sat-summary{font-size:12px;color:var(--muted);margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
 .sat-summary b{color:var(--text);font-weight:500}
+
+/* ── Автомобиль (J1939) ── */
+.vehicle-hero{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.hero-tile{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:16px;text-align:center}
+.hero-tile .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px}
+.hero-tile .big{font-family:'SF Mono',Consolas,monospace;font-size:48px;font-weight:600;line-height:1;margin:6px 0 2px;color:var(--accent)}
+.hero-tile .unit{color:var(--muted);font-size:12px}
+.hero-tile.stale .big{color:var(--muted);opacity:0.4}
+
+.veh-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+@media(max-width:768px){.veh-grid{grid-template-columns:repeat(2,1fr)}.vehicle-hero{grid-template-columns:1fr 1fr}}
+.veh-grid .val{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px;text-align:left}
+.veh-grid .val .num{font-size:18px;font-family:monospace;font-weight:600;color:var(--green)}
+.veh-grid .val.stale .num{color:var(--muted);opacity:0.4}
+
+.veh-meta{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);padding:8px 0;border-top:1px solid var(--border)}
+.veh-meta b{color:var(--text)}
+
+.dtc-list{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px}
+.dtc-chip{background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);color:var(--red);padding:4px 8px;border-radius:4px;font-family:monospace;font-size:12px}
+.dtc-empty{color:var(--muted);font-size:12px;font-style:italic}
 </style>
 </head>
 <body>
@@ -165,6 +186,42 @@ canvas{width:100%;height:140px;display:block;border-radius:4px;background:var(--
       <canvas id="skyPlot" width="260" height="260"></canvas>
       <canvas id="snrChart" height="260"></canvas>
     </div>
+  </div>
+
+  <!-- Автомобиль (J1939) -->
+  <div class="card full">
+    <h2>Показатели автомобиля (J1939)
+      <span class="badge" id="vehBadge">—</span>
+    </h2>
+    <div class="vehicle-hero">
+      <div class="hero-tile" id="tileRpm">
+        <div class="label">Обороты</div>
+        <div class="big" id="vRpm">—</div>
+        <div class="unit">об/мин</div>
+      </div>
+      <div class="hero-tile" id="tileSpeed">
+        <div class="label">Скорость</div>
+        <div class="big" id="vSpeed">—</div>
+        <div class="unit">км/ч</div>
+      </div>
+    </div>
+    <div class="veh-grid">
+      <div class="val" id="tileCoolant"><div class="label">Охл. жидкость</div><div class="num"><span id="vCoolant">—</span> °C</div></div>
+      <div class="val" id="tileOil"><div class="label">Давл. масла</div><div class="num"><span id="vOil">—</span> кПа</div></div>
+      <div class="val" id="tileFuel"><div class="label">Топливо</div><div class="num"><span id="vFuel">—</span> %</div></div>
+      <div class="val" id="tileVoltage"><div class="label">Бортовая сеть</div><div class="num"><span id="vVoltage">—</span> В</div></div>
+      <div class="val" id="tileLoad"><div class="label">Нагрузка двиг.</div><div class="num"><span id="vLoad">—</span> %</div></div>
+      <div class="val" id="tileFuelRate"><div class="label">Расход</div><div class="num"><span id="vFuelRate">—</span> л/ч</div></div>
+      <div class="val" id="tileDistance"><div class="label">Пробег</div><div class="num"><span id="vDistance">—</span> км</div></div>
+      <div class="val" id="tileHours"><div class="label">Моточасы</div><div class="num"><span id="vHours">—</span> ч</div></div>
+    </div>
+    <div class="veh-meta">
+      <span>Шина: <b id="vBaud">—</b> kbit/s</span>
+      <span>PGN распознано: <b id="vPgnKnown">0</b></span>
+      <span>PGN неизвестных: <b id="vPgnUnknown">0</b></span>
+      <span>Последний PGN: <b id="vLastPgn">—</b></span>
+    </div>
+    <div class="dtc-list" id="vDtcList"><span class="dtc-empty">Активных DTC нет</span></div>
   </div>
 
   <!-- CAN -->
@@ -523,6 +580,54 @@ function updateCanLog(frames) {
     .catch(() => {});
 }
 
+
+// ─── Vehicle (J1939) ────────────────────────────
+
+function setTileStale(id, stale) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('stale', !!stale);
+}
+
+function updateVehicle(v) {
+  const anyData = v.pgnKnown > 0;
+  const bad = $('vehBadge');
+  if (!anyData) { bad.textContent = 'Нет данных'; bad.className = 'badge fail'; }
+  else { bad.textContent = 'Активен'; bad.className = 'badge ok'; }
+
+  $('vRpm').textContent      = v.rpm_stale     ? '—' : v.rpm.toFixed(0);
+  $('vSpeed').textContent    = v.speed_stale   ? '—' : v.speed.toFixed(1);
+  $('vCoolant').textContent  = v.coolant_stale ? '—' : v.coolant.toFixed(0);
+  $('vOil').textContent      = v.oil_stale     ? '—' : v.oil;
+  $('vFuel').textContent     = v.fuel_stale    ? '—' : v.fuel.toFixed(1);
+  $('vVoltage').textContent  = v.voltage_stale ? '—' : v.voltage.toFixed(2);
+  $('vLoad').textContent     = v.load_stale    ? '—' : v.load;
+  $('vFuelRate').textContent = v.fuelRate_stale? '—' : v.fuelRate.toFixed(1);
+  $('vDistance').textContent = v.distance_stale? '—' : v.distance.toLocaleString('ru');
+  $('vHours').textContent    = v.hours_stale   ? '—' : v.hours.toFixed(1);
+
+  setTileStale('tileRpm',      v.rpm_stale);
+  setTileStale('tileSpeed',    v.speed_stale);
+  setTileStale('tileCoolant',  v.coolant_stale);
+  setTileStale('tileOil',      v.oil_stale);
+  setTileStale('tileFuel',     v.fuel_stale);
+  setTileStale('tileVoltage',  v.voltage_stale);
+  setTileStale('tileLoad',     v.load_stale);
+  setTileStale('tileFuelRate', v.fuelRate_stale);
+  setTileStale('tileDistance', v.distance_stale);
+  setTileStale('tileHours',    v.hours_stale);
+
+  $('vPgnKnown').textContent   = v.pgnKnown;
+  $('vPgnUnknown').textContent = v.pgnUnknown;
+  $('vLastPgn').textContent    = v.lastPgn ? v.lastPgn + ' (0x' + v.lastPgn.toString(16).toUpperCase() + ')' : '—';
+
+  const dtcEl = $('vDtcList');
+  if (!v.dtcs || v.dtcs.length === 0) {
+    dtcEl.innerHTML = '<span class="dtc-empty">Активных DTC нет</span>';
+  } else {
+    dtcEl.innerHTML = v.dtcs.map(d => `<span class="dtc-chip">SPN ${d.spn} · FMI ${d.fmi} · OC ${d.oc}</span>`).join('');
+  }
+}
+
 // ─── WebSocket ──────────────────────────────────
 
 let ws;
@@ -587,10 +692,14 @@ function update(d) {
     $('gpsChk').textContent = d.gps.chk;
   }
 
+  // Vehicle (J1939)
+  if (d.vehicle) updateVehicle(d.vehicle);
+
   // CAN
   if (d.can) {
     setBadge('canBadge', d.can.ok, 'INIT OK', 'INIT FAIL');
-    $('canCount').textContent = `Фреймов: ${d.can.frames}`;
+    $('canCount').textContent = `Фреймов: ${d.can.frames}${d.can.baud?' @ '+d.can.baud+'k':''}`;
+    $('vBaud').textContent = d.can.baud || '—';
     if (d.can.frames > lastCanFrameCount) {
       updateCanLog(d.can.frames);
       lastCanFrameCount = d.can.frames;
