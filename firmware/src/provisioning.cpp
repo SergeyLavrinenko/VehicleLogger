@@ -1,6 +1,7 @@
-﻿#include "provisioning.h"
+#include "provisioning.h"
 #include "config.h"
 #include "nvs_store.h"
+#include "cloud.h"
 
 #include <Arduino.h>
 #include <WiFi.h>
@@ -16,13 +17,13 @@ namespace {
   IPAddress     apIP(192, 168, 4, 1);
 
   enum WifiState   { WIFI_IDLE, WIFI_CONNECTING, WIFI_OK, WIFI_FAIL };
-  enum EnrollState { ENROLL_IDLE, ENROLL_PENDING, ENROLL_OK,
-                     ENROLL_INVALID_CODE, ENROLL_INVALID_SUBDOMAIN,
-                     ENROLL_ALREADY_CLAIMED, ENROLL_INVALID_SECRET,
-                     ENROLL_NETWORK_ERROR };
+  enum EnrollState { EN_IDLE, EN_PENDING, EN_OK,
+                     EN_INVALID_CODE, EN_INVALID_SUBDOMAIN,
+                     EN_ALREADY_CLAIMED, EN_INVALID_SECRET,
+                     EN_NETWORK_ERROR };
 
   volatile WifiState   wifiState   = WIFI_IDLE;
-  volatile EnrollState enrollState = ENROLL_IDLE;
+  volatile EnrollState enrollState = EN_IDLE;
   String   pendingSsid, pendingPass, pendingSub, pendingCode;
   uint32_t connectStartedAt = 0;
   bool     wifiBeginCalled  = false;
@@ -44,16 +45,30 @@ namespace {
   }
   const char* enrollStr(EnrollState s) {
     switch (s) {
-      case ENROLL_IDLE:               return "idle";
-      case ENROLL_PENDING:             return "pending";
-      case ENROLL_OK:                  return "ok";
-      case ENROLL_INVALID_CODE:        return "invalid_code";
-      case ENROLL_INVALID_SUBDOMAIN:   return "invalid_subdomain";
-      case ENROLL_ALREADY_CLAIMED:     return "already_claimed";
-      case ENROLL_INVALID_SECRET:      return "invalid_secret";
-      case ENROLL_NETWORK_ERROR:       return "network_error";
+      case EN_IDLE:               return "idle";
+      case EN_PENDING:             return "pending";
+      case EN_OK:                  return "ok";
+      case EN_INVALID_CODE:        return "invalid_code";
+      case EN_INVALID_SUBDOMAIN:   return "invalid_subdomain";
+      case EN_ALREADY_CLAIMED:     return "already_claimed";
+      case EN_INVALID_SECRET:      return "invalid_secret";
+      case EN_NETWORK_ERROR:       return "network_error";
     }
     return "idle";
+  }
+
+  EnrollState mapEnrollStatus(Cloud::EnrollStatus s) {
+    switch (s) {
+      case Cloud::EnrollStatus::Ok:                 return EN_OK;
+      case Cloud::EnrollStatus::InvalidCode:        return EN_INVALID_CODE;
+      case Cloud::EnrollStatus::InvalidSubdomain:   return EN_INVALID_SUBDOMAIN;
+      case Cloud::EnrollStatus::AlreadyClaimed:     return EN_ALREADY_CLAIMED;
+      case Cloud::EnrollStatus::InvalidSecret:      return EN_INVALID_SECRET;
+      case Cloud::EnrollStatus::Deactivated:        return EN_INVALID_SECRET;   // UI: "обратитесь в поддержку"
+      case Cloud::EnrollStatus::NetworkError:       return EN_NETWORK_ERROR;
+      case Cloud::EnrollStatus::UnknownError:       return EN_NETWORK_ERROR;
+    }
+    return EN_NETWORK_ERROR;
   }
 
   void handleInfo(AsyncWebServerRequest* req) {
@@ -86,7 +101,7 @@ namespace {
     String out; serializeJson(doc, out);
     req->send(200, "application/json", out);
     WiFi.scanDelete();
-    WiFi.scanNetworks(true);   // подгружаем следующий результат
+    WiFi.scanNetworks(true);
   }
 
   void handleStatus(AsyncWebServerRequest* req) {
@@ -111,7 +126,7 @@ namespace {
     }
     wifiBeginCalled  = false;
     wifiState        = WIFI_CONNECTING;
-    enrollState      = ENROLL_IDLE;
+    enrollState      = EN_IDLE;
     connectStartedAt = millis();
     Serial.printf("[PROV] Setup: ssid='%s' subdomain='%s' code='%s'\n",
                   pendingSsid.c_str(), pendingSub.c_str(), pendingCode.c_str());
@@ -125,9 +140,34 @@ namespace {
     server.addHandler(new AsyncCallbackJsonWebHandler("/api/setup", handleSetup));
     server.serveStatic("/", LittleFS, "/").setDefaultFile("setup.html");
     server.onNotFound([](AsyncWebServerRequest* req) {
-      // captive portal: любой запрос → редирект на главную
-      req->redirect("/");
+      req->redirect("/");   // captive portal
     });
+  }
+
+  void runEnroll() {
+    enrollState = EN_PENDING;
+    String apiKey, backendUrl;
+    uint32_t intervalMs = 5000;
+    Cloud::EnrollStatus s = Cloud::enroll(pendingSub, pendingCode,
+                                          apiKey, backendUrl, intervalMs);
+    enrollState = mapEnrollStatus(s);
+
+    if (s == Cloud::EnrollStatus::Ok) {
+      NvsStore::setWifi(pendingSsid, pendingPass);
+      NvsStore::setApiKey(apiKey);
+      NvsStore::setBackendUrl(backendUrl);
+      NvsStore::setSendIntervalMs(intervalMs);
+      Serial.println("[PROV] Enroll OK — NVS saved, restart in 3s");
+      delay(3000);
+      ESP.restart();
+      return;
+    }
+
+    Serial.printf("[PROV] Enroll FAIL: %s — drop WiFi, await retry\n",
+                  enrollStr(enrollState));
+    WiFi.disconnect(true, true);
+    wifiState       = WIFI_FAIL;
+    wifiBeginCalled = false;
   }
 
   void tickWifi() {
@@ -145,13 +185,9 @@ namespace {
     wl_status_t s = WiFi.status();
     if (s == WL_CONNECTED) {
       wifiState = WIFI_OK;
-      Serial.printf("[PROV] WiFi OK: %s\n", WiFi.localIP().toString().c_str());
-
-      // Этап 3: сохраняем WiFi, enroll — заглушка. Этап 5 заменит на cloud::enroll().
-      NvsStore::setWifi(pendingSsid, pendingPass);
-      Serial.printf("[PROV] WiFi saved. TODO enroll: subdomain='%s' code='%s'\n",
-                    pendingSub.c_str(), pendingCode.c_str());
-      enrollState = ENROLL_OK;
+      Serial.printf("[PROV] WiFi OK: %s — calling cloud::enroll\n",
+                    WiFi.localIP().toString().c_str());
+      runEnroll();
       return;
     }
 
