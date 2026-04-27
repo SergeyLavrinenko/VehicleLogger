@@ -1,5 +1,6 @@
-# Claude Code local settings (per-user, not shared)
+﻿# Claude Code local settings (per-user, not shared)
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 # PlatformIO
 firmware/.pio/
@@ -12,5 +13,10 @@ firmware/build/
 
 # Secrets
 firmware/include/secrets.h
-firmware/include/config.h
 firmware-test/include/config.h
+
+# Диагностические/экспериментальные прошивки (Этап 1) — в репозиторий не идут
+firmware-canlog/
+firmware-canprobe/
+firmware-canprobe-idf/
+firmware-canprobe_2/
