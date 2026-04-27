@@ -1,0 +1,129 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VehicleLogger — настройка</title>
+<style>
+  body{font-family:-apple-system,system-ui,sans-serif;max-width:480px;margin:0 auto;padding:16px;background:#f5f5f7;color:#222}
+  h1{font-size:1.4em;margin:0 0 4px}
+  .subtitle{color:#666;font-size:.9em;margin-bottom:16px}
+  .card{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .card h2{font-size:1em;margin:0 0 12px}
+  label{display:block;font-size:.85em;color:#555;margin:8px 0 4px}
+  select,input{width:100%;padding:10px;font-size:1em;border:1px solid #ccc;border-radius:6px;box-sizing:border-box}
+  .domain-row{display:flex;align-items:center;gap:4px}
+  .domain-row input{flex:1}
+  .domain-suffix{color:#999;white-space:nowrap}
+  button{width:100%;padding:12px;font-size:1.05em;background:#007aff;color:#fff;border:none;border-radius:8px;cursor:pointer;margin-top:4px}
+  button:disabled{background:#aaa;cursor:not-allowed}
+  .status{padding:12px;border-radius:8px;margin-bottom:12px;display:none;font-size:.95em}
+  .status.info{background:#e3f2fd;color:#0d47a1;display:block}
+  .status.error{background:#ffebee;color:#c62828;display:block}
+  .status.ok{background:#e8f5e9;color:#2e7d32;display:block}
+</style>
+</head>
+<body>
+<h1>VehicleLogger</h1>
+<div class="subtitle">Серийный номер: <span id="serial">…</span></div>
+
+<div id="status" class="status"></div>
+
+<div class="card">
+  <h2>1. WiFi-сеть</h2>
+  <label>Сеть</label>
+  <select id="ssid"><option value="">Поиск…</option></select>
+  <label>Пароль</label>
+  <input type="password" id="password" autocomplete="off">
+</div>
+
+<div class="card">
+  <h2>2. Привязка к компании</h2>
+  <label>Поддомен</label>
+  <div class="domain-row">
+    <input type="text" id="subdomain" autocapitalize="none" autocorrect="off" placeholder="acme">
+    <span class="domain-suffix">.<span id="basedomain">example.com</span></span>
+  </div>
+  <label>Код привязки (6 цифр)</label>
+  <input type="text" id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="000000">
+</div>
+
+<button id="submit">Подключить и привязать</button>
+
+<script>
+const $ = id => document.getElementById(id);
+const status = (msg, kind) => { const s = $("status"); s.className = "status " + kind; s.textContent = msg; };
+
+async function loadInfo() {
+  try {
+    const j = await (await fetch("/api/info")).json();
+    $("serial").textContent = j.serial;
+    $("basedomain").textContent = j.baseDomain;
+  } catch(e) {}
+}
+async function loadScan() {
+  const sel = $("ssid");
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      const r = await fetch("/api/scan");
+      if (r.status === 202) { await new Promise(r => setTimeout(r, 1500)); continue; }
+      const list = await r.json();
+      list.sort((a,b) => b.rssi - a.rssi);
+      sel.innerHTML = list.length ? "" : "<option value=''>Сети не найдены</option>";
+      for (const n of list) {
+        const o = document.createElement("option");
+        o.value = n.ssid;
+        o.textContent = `${n.ssid}  ${n.rssi} dBm${n.secure?" 🔒":""}`;
+        sel.appendChild(o);
+      }
+      return;
+    } catch(e) { await new Promise(r => setTimeout(r, 1500)); }
+  }
+  sel.innerHTML = "<option value=''>Ошибка сканирования</option>";
+}
+
+async function poll() {
+  try {
+    const s = await (await fetch("/api/status")).json();
+    if (s.wifi === "connecting") status("Подключение к WiFi…", "info");
+    else if (s.wifi === "fail")  { status("Не удалось подключиться к WiFi. Проверьте пароль.", "error"); $("submit").disabled = false; return; }
+    else if (s.wifi === "ok" && s.enroll === "pending") status(`WiFi подключён (${s.ip}). Привязка…`, "info");
+    else if (s.enroll === "ok") { status("Привязано! Устройство готово к работе.", "ok"); return; }
+    else if (s.enroll === "invalid_code")      { status("Код привязки не подходит. Проверьте код и поддомен у админа.", "error"); $("submit").disabled = false; return; }
+    else if (s.enroll === "invalid_subdomain") { status("Поддомен не найден на сервере.", "error"); $("submit").disabled = false; return; }
+    else if (s.enroll === "already_claimed")   { status("Устройство уже привязано к другой компании. Нужен unclaim из ЛК.", "error"); $("submit").disabled = false; return; }
+    else if (s.enroll === "invalid_secret")    { status("Повреждённый секрет устройства. Обратитесь в поддержку.", "error"); return; }
+    else if (s.enroll === "network_error")     { status("Сервер не отвечает. Проверьте интернет в выбранной сети.", "error"); $("submit").disabled = false; return; }
+    setTimeout(poll, 1000);
+  } catch(e) { setTimeout(poll, 2000); }
+}
+
+$("submit").onclick = async () => {
+  const ssid      = $("ssid").value;
+  const password  = $("password").value;
+  const subdomain = $("subdomain").value.trim().toLowerCase();
+  const code      = $("code").value;
+  if (!ssid)                      return status("Выберите WiFi-сеть", "error");
+  if (!subdomain)                 return status("Укажите поддомен", "error");
+  if (!/^[0-9]{6}$/.test(code))   return status("Код должен быть 6 цифр", "error");
+  $("submit").disabled = true;
+  status("Отправка настроек…", "info");
+  try {
+    const r = await fetch("/api/setup", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ssid, password, subdomain, enrollCode: code})
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    poll();
+  } catch(e) {
+    status("Ошибка отправки: " + e.message, "error");
+    $("submit").disabled = false;
+  }
+};
+
+loadInfo();
+loadScan();
+</script>
+</body>
+</html>

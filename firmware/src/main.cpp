@@ -11,6 +11,7 @@
 #include <WiFi.h>
 #include "config.h"
 #include "nvs_store.h"
+#include "provisioning.h"
 
 enum BootMode { MODE_PROVISIONING, MODE_WORKING };
 
@@ -29,15 +30,9 @@ static void printBanner() {
   Serial.println(F("================================="));
 }
 
-static void enterProvisioningMode() {
-  Serial.println(F("[BOOT] Provisioning mode (SoftAP)"));
-  // TODO: provisioning::start();  — добавится на следующем шаге плана (SoftAP + captive portal)
-}
-
 static void enterWorkingMode() {
   Serial.println(F("[BOOT] Working mode (telemetry)"));
-  // TODO: wifi_manager::connect();  — далее по плану
-  // TODO: cloud::startTelemetry();
+  // TODO: wifi_manager::connect();  cloud::startTelemetry();  — этап 5
 }
 
 void setup() {
@@ -54,16 +49,20 @@ void setup() {
                 NvsStore::getSecretHex().length() == 64 ? "yes" : "NO");
 
   String ssid, pass, apiKey, url;
-  bool hasWifi  = NvsStore::getWifi(ssid, pass);
-  bool hasKey   = NvsStore::getApiKey(apiKey);
-  url           = NvsStore::getBackendUrl();
+  bool hasWifi = NvsStore::getWifi(ssid, pass);
+  bool hasKey  = NvsStore::getApiKey(apiKey);
+  url          = NvsStore::getBackendUrl();
 
   Serial.printf("[NVS] WiFi:    %s\n", hasWifi ? ssid.c_str() : "(не настроено)");
   Serial.printf("[NVS] API key: %s\n", hasKey ? "есть" : "(нет)");
   Serial.printf("[NVS] Backend: %s\n", url.length() ? url.c_str() : "(не настроено)");
 
-  if (decideBootMode() == MODE_PROVISIONING) enterProvisioningMode();
-  else                                       enterWorkingMode();
+  if (decideBootMode() == MODE_PROVISIONING) {
+    Serial.println(F("[BOOT] Provisioning mode (SoftAP)"));
+    Provisioning::start();   // блокирующий, не возвращается
+  } else {
+    enterWorkingMode();
+  }
 }
 
 void loop() {
