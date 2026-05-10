@@ -1,0 +1,30 @@
+I (9274) canprobe: [STAT] state=0 tx_err=0 rx_err=0 rx_total=0
+I (14274) canprobe: [STAT] state=0 tx_err=0 rx_err=0 rx_total=0
+I (19274) canprobe: [STAT] state=0 tx_err=0 rx_err=0 rx_total=0
+I (24274) canprobe: [STAT] state=0 tx_err=0 rx_err=0 rx_total=0
+W (28697) canprobe: bus error flags=0x2
+W (28699) canprobe: bus error flags=0x2
+W (28699) canprobe: bus error flags=0x2
+W (28701) canprobe: bus error flags=0x2
+W (28702) canprobe: bus error flags=0x2
+W (28704) canprobe: bus error flags=0x2
+W (28707) canprobe: bus error flags=0x2
+W (28710) canprobe: bus error flags=0x2
+W (28714) canprobe: bus error flags=0x2
+W (28718) canprobe: bus error flags=0x2
+W (28721) canprobe: bus error flags=0x2
+I (28721) canprobe: state error_active -> error_warning
+W (28730) canprobe: bus error flags=0x2
+W (28733) canprobe: bus error flags=0x2
+I (28733) canprobe: state error_warning -> error_passive
+I (29274) canprobe: [STAT] state=2 tx_err=0 rx_err=135 rx_total=0
+W (29697) canprobe: bus error flags=0x2
+W (30697) canprobe: bus error flags=0x2
+W (31697) canprobe: bus error flags=0x2
+W (32697) canprobe: bus error flags=0x2
+W (33698) canprobe: bus error flags=0x2
+I (34274) canprobe: [STAT] state=2 tx_err=0 rx_err=135 rx_total=0
+W (34698) canprobe: bus error flags=0x2
+W (35698) canprobe: bus error flags=0x2
+W (36698) canprobe: bus error flags=0x2
+W (37698) canprobe: bus error flags=0x2

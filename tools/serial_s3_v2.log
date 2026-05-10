@@ -1,0 +1,58 @@
+I (209136) canprobe: [STAT] state=0 tx_err=0 rx_err=0 rx_total=0
+W (213885) canprobe: bus error flags=0x2
+W (213885) canprobe: bus error flags=0x2
+W (213888) canprobe: bus error flags=0x2
+W (213888) canprobe: bus error flags=0x2
+W (213890) canprobe: bus error flags=0x2
+W (213890) canprobe: bus error flags=0x2
+W (213892) canprobe: bus error flags=0x2
+W (213892) canprobe: bus error flags=0x2
+W (213895) canprobe: bus error flags=0x2
+W (213895) canprobe: bus error flags=0x2
+W (213897) canprobe: bus error flags=0x2
+W (213897) canprobe: bus error flags=0x2
+W (213900) canprobe: bus error flags=0x2
+W (213900) canprobe: bus error flags=0x2
+W (213902) canprobe: bus error flags=0x2
+W (213902) canprobe: bus error flags=0x2
+W (213904) canprobe: bus error flags=0x2
+W (213904) canprobe: bus error flags=0x2
+W (213907) canprobe: bus error flags=0x2
+W (213907) canprobe: bus error flags=0x2
+W (213909) canprobe: bus error flags=0x2
+W (213909) canprobe: bus error flags=0x2
+I (213909) canprobe: state error_active -> error_warning
+W (213911) canprobe: bus error flags=0x2
+W (213911) canprobe: bus error flags=0x2
+W (213914) canprobe: bus error flags=0x2
+W (213914) canprobe: bus error flags=0x2
+W (213916) canprobe: bus error flags=0x2
+W (213916) canprobe: bus error flags=0x2
+W (213919) canprobe: bus error flags=0x2
+W (213919) canprobe: bus error flags=0x2
+I (213919) canprobe: state error_warning -> error_passive
+W (213921) canprobe: bus error flags=0x2
+I (214136) canprobe: [STAT] state=2 tx_err=0 rx_err=135 rx_total=0
+W (214885) canprobe: bus error flags=0x2
+W (215886) canprobe: bus error flags=0x2
+W (216886) canprobe: bus error flags=0x2
+W (217886) canprobe: bus error flags=0x2
+W (218886) canprobe: bus error flags=0x2
+I (219136) canprobe: [STAT] state=2 tx_err=0 rx_err=135 rx_total=0
+W (219886) canprobe: bus error flags=0x2
+W (220886) canprobe: bus error flags=0x2
+W (221886) canprobe: bus error flags=0x2
+W (222886) canprobe: bus error flags=0x2
+W (223886) canprobe: bus error flags=0x2
+I (224136) canprobe: [STAT] state=2 tx_err=0 rx_err=135 rx_total=0
+W (224887) canprobe: bus error flags=0x2
+W (225887) canprobe: bus error flags=0x2
+W (226887) canprobe: bus error flags=0x2
+W (227887) canprobe: bus error flags=0x2
+W (228888) canprobe: bus error flags=0x2
+I (229136) canprobe: [STAT] state=2 tx_err=0 rx_err=135 rx_total=0
+W (229888) canprobe: bus error flags=0x2
+W (230888) canprobe: bus error flags=0x2
+W (231888) canprobe: bus error flags=0x2
+W (232888) canprobe: bus error flags=0x2
+I (234136) canprobe: [STAT] state=2 tx_err=0 rx_err=135 rx_total=0

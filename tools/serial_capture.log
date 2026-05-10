@@ -1,0 +1,65 @@
+W (2069927) canprobe: bus error flags=0x2
+I (2069927) canprobe: TX 0x123 (total=1927)
+I (2069927) canprobe: [STAT] state=2 tx_err=144 rx_err=0 tx=1927 rx=0
+W (2070929) canprobe: bus error flags=0x2
+I (2070929) canprobe: TX 0x123 (total=1928)
+W (2071929) canprobe: bus error flags=0x2
+I (2071929) canprobe: TX 0x123 (total=1929)
+W (2072929) canprobe: bus error flags=0x2
+I (2072929) canprobe: TX 0x123 (total=1930)
+W (2073929) canprobe: bus error flags=0x2
+I (2073929) canprobe: TX 0x123 (total=1931)
+I (2073929) canprobe: [STAT] state=2 tx_err=176 rx_err=0 tx=1931 rx=0
+W (2074931) canprobe: bus error flags=0x2
+I (2074931) canprobe: TX 0x123 (total=1932)
+W (2075931) canprobe: bus error flags=0x2
+I (2075931) canprobe: TX 0x123 (total=1933)
+W (2076931) canprobe: bus error flags=0x2
+I (2076931) canprobe: TX 0x123 (total=1934)
+W (2077931) canprobe: bus error flags=0x2
+I (2077931) canprobe: TX 0x123 (total=1935)
+I (2077931) canprobe: [STAT] state=2 tx_err=208 rx_err=0 tx=1935 rx=0
+W (2078933) canprobe: bus error flags=0x2
+I (2078933) canprobe: TX 0x123 (total=1936)
+W (2079122) canprobe: bus error flags=0x2
+W (2079933) canprobe: bus error flags=0x2
+I (2079933) canprobe: TX 0x123 (total=1937)
+W (2080122) canprobe: bus error flags=0x2
+W (2080933) canprobe: bus error flags=0x2
+I (2080933) canprobe: TX 0x123 (total=1938)
+W (2081122) canprobe: bus error flags=0x2
+W (2081933) canprobe: bus error flags=0x2
+I (2081933) canprobe: TX 0x123 (total=1939)
+I (2081933) canprobe: [STAT] state=2 tx_err=240 rx_err=3 tx=1939 rx=0
+W (2082122) canprobe: bus error flags=0x2
+W (2082935) canprobe: bus error flags=0x2
+I (2082935) canprobe: state error_passive -> bus_off
+I (2082935) canprobe: TX 0x123 (total=1940)
+W (2083936) canprobe: BUS-OFF, recover...
+I (2084095) canprobe: state bus_off -> error_active
+W (2084100) canprobe: bus error flags=0x2
+W (2084100) canprobe: bus error flags=0x2
+W (2084100) canprobe: bus error flags=0x2
+W (2084102) canprobe: bus error flags=0x2
+I (2084102) canprobe: state error_active -> error_passive
+W (2084111) canprobe: bus error flags=0x2
+W (2084122) canprobe: bus error flags=0x2
+W (2085122) canprobe: bus error flags=0x2
+W (2086122) canprobe: bus error flags=0x2
+W (2087122) canprobe: bus error flags=0x2
+W (2088122) canprobe: bus error flags=0x2
+W (2089122) canprobe: bus error flags=0x2
+I (2089936) canprobe: after recover state=2
+W (2090122) canprobe: bus error flags=0x2
+W (2090936) canprobe: bus error flags=0x2
+I (2090936) canprobe: TX 0x123 (total=1941)
+W (2091122) canprobe: bus error flags=0x2
+W (2091936) canprobe: bus error flags=0x2
+I (2091936) canprobe: TX 0x123 (total=1942)
+I (2091936) canprobe: [STAT] state=2 tx_err=8 rx_err=129 tx=1942 rx=0
+W (2092122) canprobe: bus error flags=0x2
+W (2092938) canprobe: bus error flags=0x2
+I (2092938) canprobe: TX 0x123 (total=1943)
+W (2093122) canprobe: bus error flags=0x2
+W (2093938) canprobe: bus error flags=0x2
+I (2093938) canprobe: TX 0x123 (total=1944)

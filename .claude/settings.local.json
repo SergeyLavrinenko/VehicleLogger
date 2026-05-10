@@ -1,7 +1,13 @@
 {
   "permissions": {
+    "deny": [
+      "Edit",
+      "Write"
+    ],
     "allow": [
-      "Bash(git ls-tree:*)"
+      "Edit(/firmware/**)",
+      "Write(/firmware/**)",
+      "Bash(git *)"
     ]
   }
 }

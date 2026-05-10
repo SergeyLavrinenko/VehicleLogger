@@ -15,8 +15,6 @@
 
 ## Распиновка (LIVE MINI KIT ESP32)
 
-Пины подобраны под разводку платы — каждая пара физически рядом на разъёмах.
-
 | ESP32 GPIO | Подключение | Сторона платы | Примечание |
 |------------|-------------|---------------|------------|
 | GPIO 22 | WCMCU-230 CTX (CAN TX) | Левая inner, строка 3 | TWAI TX |
@@ -25,143 +23,119 @@
 | GPIO 17 | NEO-M8N RX | Левая inner, строка 5 | UART2 TX (ESP → GPS) |
 | GPIO 18 | MPU-6050 SDA | Правая inner, строка 4 | I2C Data |
 | GPIO 19 | MPU-6050 SCL | Правая inner, строка 5 | I2C Clock |
+| GPIO 0 | Кнопка BOOT/Reset | Встроена | 5 сек → WiFi reset, 10 сек → factory reset |
+| GPIO 2 | Встроенный LED | Встроен | Индикация состояния |
 | 3.3V | Питание модулей | Правая, строка 8 | |
 | GND | Общая земля | Левая, строка 1/7 | |
 
 ---
 
-## Этапы разработки
+## Прогресс этапов
 
-### Этап 0 — Диагностика (текущий)
+### Этап 1 ✓ — Среда и диагностика *(commit `1cc8a7a`)*
 
-Цель: проверить работоспособность и правильность подключения всех модулей.
-
-**Файл:** `src/main.cpp` (диагностический скетч)
-
-**Тесты:**
-- [x] Wi-Fi — подключение к сети, вывод IP и RSSI
-- [x] I2C scan + MPU-6050 — поиск устройств на шине, чтение WHO_AM_I, чтение акселерометра/гироскопа
-- [x] CAN/TWAI (WCMCU-230) — инициализация драйвера, приём фреймов (5 сек)
-- [x] GPS (NEO-M8N) — чтение UART, парсинг NMEA, поиск фикса
-
-**Как запустить:**
-1. Вписать Wi-Fi в `include/config.h`
-2. Собрать и прошить: `pio run -t upload`
-3. Открыть Serial Monitor: `pio device monitor`
-4. Смотреть результаты — OK/FAIL по каждому модулю
-
----
-
-### Этап 1 — Setup ✓
-
-Цель: настройка среды, проверка железа, тестовый стенд.
-
-**Задачи:**
-
-- [x] Создать PlatformIO проект (Arduino framework)
-- [x] Подключение к Wi-Fi (SSID/пароль в конфиге)
-- [x] Диагностика всех модулей (Wi-Fi, IMU, CAN, GPS)
-- [x] Тестовый веб-дашборд (`firmware-test/`) с live-графиками, sky plot, SNR
-- [x] Проектирование провизионинга (`PROVISIONING.md`)
+- [x] PlatformIO + Arduino framework
+- [x] Диагностический скетч (`firmware/src/main.cpp` v0): WiFi / I2C / CAN-init / GPS NMEA
+- [x] Тестовый стенд `firmware-test/` с веб-дашбордом, sky-plot, SNR
 - [x] Документация API (`docs/api.html`)
-- [ ] Отправка тестовой телеметрии `POST /api/telemetry` → перенесено на Этап 2 (ждёт бэкенд)
-- [ ] Отправка heartbeat `POST /api/device/ping` → перенесено на Этап 2
-- [ ] Заголовок `X-Device-Key` с тестовым ключом → перенесено на Этап 2
+- [x] Дизайн-документ провизионинга `PROVISIONING.md` (первая редакция — QR-claim flow)
 
-**Формат тестового пакета:**
+### Этап 2 ✓ — Декодеры CAN *(commit `32a1c61`)*
 
-```json
-{
-  "deviceId": "ESP32-TEST-001",
-  "timestamp": "2026-03-22T14:30:00Z",
-  "data": {
-    "rpm": 1500,
-    "speed": 60,
-    "coolantTemp": 85,
-    "oilPressure": 3.2,
-    "fuelLevel": 70,
-    "voltage": 13.6,
-    "dtcCodes": []
-  }
-}
-```
+- [x] J1939 декодер: 10 PGN (RPM, speed, coolant, oil pressure, fuel level, voltage, fuel rate, engine load, total distance, engine hours) + DM1 (single-frame DTC)
+- [x] OBD-II поллер: 7 PID (Mode 01: load, coolant, RPM, speed, fuel, voltage, fuel rate)
+- [x] Auto-baud: 500 → 250 кбит/с после таймаута
+- [x] Auto-protocol: J1939 (listen-only) ↔ OBD-II (NORMAL + опрос 0x7DF)
+- [x] WiFiMulti — две точки сразу (стол + телефон-хотспот в авто)
+- [x] Карточка «Показатели автомобиля» в дашборде `firmware-test/`
+- [x] Сквозной тест: USBCAN-2A → ESP32 → дашборд
 
-**Зависимость:** URL бэкенда Тимура (пока можно тестировать на httpbin.org или локальный сервер).
+### Этап 3 ✓ — Провизионинг (subdomain + 6-значный код) *(commits `06dced1`, `f4b0117`, `09699f8`, `aabde2e`)*
 
-### Этап 2 — CAN-шина
+Архитектура: мультитенантность через wildcard `*.example.com`. Каждая компания = поддомен. Установщик в captive portal вводит WiFi + поддомен + код, ESP сразу делает один POST `/api/devices/enroll`.
 
-- [ ] Инициализация TWAI (CAN) контроллера
-- [ ] Подключение WCMCU-230, приём CAN-кадров
-- [ ] Парсинг OBD-II PID: обороты, температура, скорость, давление масла, уровень топлива, напряжение
-- [ ] Чтение DTC-кодов
-- [ ] Замена тестовых данных на реальные
+- [x] Переписан `PROVISIONING.md` (subdomain + enrollment_codes вместо QR-claim)
+- [x] NVS-обёртка `nvs_store.{h,cpp}` (factory / wifi / cloud namespaces)
+- [x] Boot state machine: provisioning vs working — по содержимому NVS
+- [x] SoftAP + DNS catch-all + AsyncWebServer + LittleFS
+- [x] Captive portal `data/setup.html` (~6 КБ): WiFi-скан + поддомен + код
+- [x] HTTPS POST `/api/devices/enroll` с маппингом 200/400/403/404/409/410
+- [x] Перенос декодеров J1939/OBD-II в `firmware/src/`
 
-### Этап 3 — GPS
+### Этап 4 — Working mode + телеметрия *(ждёт backend)*
 
-- [ ] Инициализация UART2 для NEO-M8N
-- [ ] Парсинг NMEA (библиотека TinyGPSPlus)
-- [ ] Добавление координат и GPS-скорости в пакет телеметрии
+- [ ] `wifi_manager.{h,cpp}` — connect from NVS, reconnect, fail-back в SoftAP при многократных потерях
+- [ ] CAN init с auto-baud/auto-proto в `MODE_WORKING` (адаптировать из `firmware-test/`)
+- [ ] `cloud::startTelemetry()` — POST `/api/telemetry` (Bearer api_key) с `VehicleData` каждые `sendIntervalMs`
+- [ ] Heartbeat `/api/device/ping` каждые 60 сек
+- [ ] Обработка 401 (ключ отозван) → стираем `cloud/api_key` → SoftAP
+- [ ] Обработка 410 (deactivated) → SoftAP
 
-### Этап 4 — IMU (MPU-6050)
+Зависимости от Тимура: `/api/devices/enroll`, `/api/devices/{id}/unclaim`, `/api/devices/{id}/rotate-key`, `/api/enrollment-codes`, `/api/telemetry`, `/api/device/ping`.
 
-- [ ] Инициализация I2C, чтение данных с MPU-6050
-- [ ] Детекция событий: резкое торможение, ускорение, сильная вибрация
-- [ ] Добавление данных IMU в пакет телеметрии
+### Этап 5 — GPS и IMU в основной firmware
 
-### Этап 5 — Провизионинг и мультитенантность
+- [ ] `gps_reader.{h,cpp}` — UART2 + TinyGPSPlus (адаптировать из `firmware-test/`)
+- [ ] `imu_reader.{h,cpp}` — MPU-6050 через `Wire` (адаптировать из `firmware-test/`)
+- [ ] Детекция событий IMU: резкое торможение (ax < -0.6g), удар (sqrt(a²) > 2g)
+- [ ] Добавить координаты + IMU-snapshot в пакет телеметрии
 
-> Подробный дизайн-документ: [`PROVISIONING.md`](PROVISIONING.md)
+### Этап 6 — Reset, LED, factory script
 
-- [ ] NVS-обёртка (замена hardcode config.h на NVS для WiFi/ключей)
-- [ ] Boot state machine (SoftAP → WiFi → Provision → Operational)
-- [ ] SoftAP + captive portal (настройка WiFi через телефон)
-- [ ] Поллинг `POST /api/devices/provision` (получение API-ключа)
-- [ ] Кнопка сброса (GPIO 0): 5 сек = WiFi reset, 10 сек = factory reset
-- [ ] LED-индикация состояний
-- [ ] Заводской скрипт (Python + esptool): серийный номер + секрет в NVS
+- [ ] Кнопка GPIO 0 — 5 сек → `NvsStore::resetWifi()`, 10 сек → `NvsStore::factoryReset()` + restart
+- [ ] `led_status.{h,cpp}` — паттерны: 1 Гц SoftAP, 4 Гц connecting, постоянный working, double-flash error
+- [ ] `tools/factory_provision.py` — esptool + запись serial (из MAC) + 32-байтного secret в NVS-партицию + отправка `serial + sha256(secret)` на бэкенд
 
-### Этап 6 — Буферизация и надёжность
+### Этап 7 — Буферизация и надёжность
 
-- [ ] Локальный буфер (SPIFFS/LittleFS) при потере Wi-Fi
+- [ ] LittleFS-буфер при потере WiFi (ring-buffer телеметрии, ~1 час истории)
 - [ ] Повторная отправка при восстановлении связи
-- [ ] Watchdog timer
+- [ ] Watchdog timer (`esp_task_wdt`)
+- [ ] Защита от bus-off на CAN (auto-recover из firmware-test/ уже работает)
+
+### Этап 8 — OTA-обновление *(отдельный документ)*
+
+- [ ] HTTPS OTA с проверкой подписи прошивки
+- [ ] Канал обновлений на тенант (stable / beta)
 
 ---
 
 ## Стек
 
-- **Фреймворк:** Arduino (через PlatformIO)
-- **Сборка:** PlatformIO CLI
-- **Библиотеки:**
-  - WiFi.h (встроенная)
-  - HTTPClient.h (встроенная)
-  - ArduinoJson (JSON)
-  - driver/twai.h (CAN, ESP-IDF компонент)
-  - TinyGPSPlus (GPS NMEA парсинг)
-  - Wire.h + MPU6050 lib (I2C, IMU)
-  - ESPAsyncWebServer (captive portal, этап 5)
-  - Preferences.h (NVS, этап 5)
-  - WiFiClientSecure (HTTPS, этап 5)
+- **Фреймворк:** Arduino-ESP32 через PlatformIO
+- **Библиотеки** (`firmware/platformio.ini`):
+  - `me-no-dev/ESPAsyncWebServer @ ^1.2.4` — captive portal
+  - `me-no-dev/AsyncTCP @ ^1.1.1` — async TCP
+  - `bblanchon/ArduinoJson @ ^7.0.0` — JSON
+  - `mikalhart/TinyGPSPlus @ ^1.1.0` — NMEA-парсер
+  - Built-in: `WiFi`, `WiFiClientSecure`, `HTTPClient`, `Preferences` (NVS), `LittleFS`, `DNSServer`, `Wire` (I2C), `driver/twai.h` (CAN)
 
-## Структура проекта (целевая)
+## Структура `firmware/`
 
 ```
 firmware/
-├── plan.md              # Этот файл
-├── ASSEMBLY.md          # Инструкция по сборке
-├── PROVISIONING.md      # Дизайн провизионинга
-├── platformio.ini       # Конфигурация PlatformIO
-├── src/
-│   ├── main.cpp         # State machine: boot → provision → operational
-│   ├── provisioning.cpp # SoftAP, DNS, captive portal
-│   ├── wifi_manager.cpp # WiFi подключение, NVS-креды
-│   ├── cloud.cpp        # HTTP: provision, telemetry, heartbeat
-│   ├── nvs_store.cpp    # Обёртка над NVS
-│   ├── can_reader.cpp   # CAN/TWAI
-│   ├── gps_reader.cpp   # GPS NMEA
-│   ├── imu_reader.cpp   # MPU-6050
-│   └── led_status.cpp   # LED-индикация
+├── plan.md                  # Этот файл
+├── PROVISIONING.md          # Дизайн провизионинга (subdomain + enroll-code)
+├── ASSEMBLY.md              # Инструкция по сборке
+├── platformio.ini
+├── data/
+│   └── setup.html           # captive portal HTML
 ├── include/
-│   └── config.h         # Только пины и аппаратные константы
-└── lib/
+│   └── config.h             # пины + AP_PASSWORD + BASE_DOMAIN (без секретов)
+└── src/
+    ├── main.cpp             # boot state machine (provisioning ↔ working)
+    ├── nvs_store.{h,cpp}    # обёртка Preferences (factory / wifi / cloud)
+    ├── provisioning.{h,cpp} # SoftAP + DNS + captive portal + /api/setup
+    ├── cloud.{h,cpp}        # HTTPS POST /api/devices/enroll
+    ├── j1939.{h,cpp}        # декодер J1939 (этап 2)
+    ├── obd2.{h,cpp}         # OBD-II поллер (этап 2)
+    │
+    ├── wifi_manager.{h,cpp} # TODO этап 4
+    ├── gps_reader.{h,cpp}   # TODO этап 5
+    ├── imu_reader.{h,cpp}   # TODO этап 5
+    └── led_status.{h,cpp}   # TODO этап 6
 ```
+
+## Параллельный стенд `firmware-test/`
+
+Используется для отладки декодеров и сенсоров без production-провизионинга. Содержит web-дашборд (LittleFS + WebSocket) с live-показателями автомобиля, GPS-картой и IMU-графиками. Не идёт в продакшн — переносим оттуда модули в `firmware/` по мере готовности этапов.

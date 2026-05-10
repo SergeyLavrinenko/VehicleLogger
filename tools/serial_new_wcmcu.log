@@ -1,0 +1,69 @@
+I (60136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=61)
+W (60138) canprobe: bus error flags=0x10
+I (61136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=62)
+W (61138) canprobe: bus error flags=0x10
+I (62136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=63)
+W (62138) canprobe: bus error flags=0x10
+I (63136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=64)
+W (63138) canprobe: bus error flags=0x10
+I (64136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=65)
+I (64136) canprobe: [STAT] state=2 tx_err=128 rx_err=0 tx=65 rx=0
+W (64138) canprobe: bus error flags=0x10
+I (65136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=66)
+W (65138) canprobe: bus error flags=0x10
+I (66136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=67)
+W (66138) canprobe: bus error flags=0x10
+I (67136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=68)
+W (67138) canprobe: bus error flags=0x10
+I (68136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=69)
+W (68138) canprobe: bus error flags=0x10
+I (69136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=70)
+I (69136) canprobe: [STAT] state=2 tx_err=128 rx_err=0 tx=70 rx=0
+W (69138) canprobe: bus error flags=0x10
+I (70136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=71)
+W (70138) canprobe: bus error flags=0x10
+I (71136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=72)
+W (71138) canprobe: bus error flags=0x10
+I (72136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=73)
+W (72138) canprobe: bus error flags=0x10
+I (73136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=74)
+W (73138) canprobe: bus error flags=0x10
+I (74136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=75)
+I (74136) canprobe: [STAT] state=2 tx_err=128 rx_err=0 tx=75 rx=0
+W (74138) canprobe: bus error flags=0x10
+I (74847) canprobe: RX id=0x456 dlc=8 aa bb cc dd 11 22 33 44
+I (75136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=76)
+I (75138) canprobe: state error_passive -> error_active
+I (75847) canprobe: RX id=0x456 dlc=8 aa bb cc dd 11 22 33 44
+I (76136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=77)
+I (76847) canprobe: RX id=0x456 dlc=8 aa bb cc dd 11 22 33 44
+I (77136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=78)
+I (77847) canprobe: RX id=0x456 dlc=8 aa bb cc dd 11 22 33 44
+I (78136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=79)
+I (78847) canprobe: RX id=0x456 dlc=8 aa bb cc dd 11 22 33 44
+I (79136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=80)
+I (79136) canprobe: [STAT] state=0 tx_err=124 rx_err=0 tx=80 rx=5
+I (79847) canprobe: RX id=0x456 dlc=8 aa bb cc dd 11 22 33 44
+I (80136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=81)
+I (80848) canprobe: RX id=0x456 dlc=8 aa bb cc dd 11 22 33 44
+I (81136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=82)
+I (81848) canprobe: RX id=0x456 dlc=8 aa bb cc dd 11 22 33 44
+I (82136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=83)
+I (82848) canprobe: RX id=0x456 dlc=8 aa bb cc dd 11 22 33 44
+I (83136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=84)
+I (83848) canprobe: RX id=0x456 dlc=8 aa bb cc dd 11 22 33 44
+I (84136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=85)
+I (84136) canprobe: [STAT] state=0 tx_err=119 rx_err=0 tx=85 rx=10
+I (84848) canprobe: RX id=0x456 dlc=8 aa bb cc dd 11 22 33 44
+I (85136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=86)
+I (85848) canprobe: RX id=0x456 dlc=8 aa bb cc dd 11 22 33 44
+I (86136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=87)
+I (86848) canprobe: RX id=0x456 dlc=8 aa bb cc dd 11 22 33 44
+I (87136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=88)
+I (87848) canprobe: RX id=0x456 dlc=8 aa bb cc dd 11 22 33 44
+I (88136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=89)
+I (88849) canprobe: RX id=0x456 dlc=8 aa bb cc dd 11 22 33 44
+I (89136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=90)
+I (89136) canprobe: [STAT] state=0 tx_err=114 rx_err=0 tx=90 rx=15
+I (89849) canprobe: RX id=0x456 dlc=8 aa bb cc dd 11 22 33 44
+I (90136) canprobe: TX 0x123 DE AD BE EF 11 22 33 44 (total=91)

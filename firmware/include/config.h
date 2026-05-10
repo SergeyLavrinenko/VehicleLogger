@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 // ─── CAN (TWAI) ─────────────────────────────
 #define CAN_TX_PIN    GPIO_NUM_22
@@ -16,7 +16,7 @@
 
 // ─── Провизионинг ───────────────────────────
 #define AP_PASSWORD          "setup1234"          // пароль SoftAP, печатается на наклейке
-#define BASE_DOMAIN          "example.com"        // <subdomain>.example.com
+#define BASE_DOMAIN          "nonconf.ru"         // <subdomain>.nonconf.ru
 #define WIFI_RETRY_COUNT     5
 
 // ─── Сброс / индикация ──────────────────────
