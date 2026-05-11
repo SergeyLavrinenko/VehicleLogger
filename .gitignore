@@ -20,3 +20,20 @@ firmware-canlog/
 firmware-canprobe/
 firmware-canprobe-idf/
 firmware-canprobe_2/
+
+# .NET backend
+backend/bin/
+backend/obj/
+backend/publish/
+backend/*.db
+backend/*.db-journal
+backend/*.user
+
+# Vue frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/npm-debug.log*
+
+# Локальные конфиги Тимура
+tools/device-sim/node_modules/
