@@ -449,6 +449,15 @@ void readCAN() {
     sensorData.lastDlc = msg.data_length_code;
     memcpy(sensorData.lastData, msg.data, 8);
 
+    // Печатаем каждый принятый фрейм в Serial (для диагностики без web)
+    Serial.printf("[CAN] %s id=0x%08lX dlc=%u data=",
+                  msg.extd ? "EXT" : "STD",
+                  (unsigned long)msg.identifier, msg.data_length_code);
+    for (int i = 0; i < msg.data_length_code; i++) {
+      Serial.printf("%02X ", msg.data[i]);
+    }
+    Serial.println();
+
     if (msg.extd) {
       j1939Decode(msg.identifier, msg.data, msg.data_length_code);
     } else {
@@ -639,7 +648,7 @@ void initWiFi() {
 
   WiFi.mode(WIFI_STA);
   int attempts = 0;
-  while (wifiMulti.run() != WL_CONNECTED && attempts < 60) {
+  while (wifiMulti.run() != WL_CONNECTED && attempts < 5) {
     delay(500);
     Serial.print(".");
     attempts++;
@@ -651,9 +660,7 @@ void initWiFi() {
     Serial.print("[WiFi] IP: ");    Serial.println(WiFi.localIP());
     Serial.print("[WiFi] RSSI: ");  Serial.print(WiFi.RSSI()); Serial.println(" dBm");
   } else {
-    Serial.println("[WiFi] FAIL - перезагрузка через 5 сек...");
-    delay(5000);
-    ESP.restart();
+    Serial.println("[WiFi] FAIL — продолжаем БЕЗ web-дашборда, диагностика только в Serial");
   }
 }
 
@@ -740,5 +747,17 @@ void loop() {
     lastWsSend = millis();
     sendSensorData();
     ws.cleanupClients();
+  }
+
+  static uint32_t lastStat = 0;
+  if (millis() - lastStat >= 3000) {
+    lastStat = millis();
+    Serial.printf("[STAT] frames=%d  baud=%d  proto=%s  pgnKnown=%lu  pgnUnknown=%lu  obdResp=%lu\n",
+                  sensorData.framesTotal,
+                  canBaudKbit,
+                  (canProto == PROTO_J1939) ? "J1939" : (canProto == PROTO_OBD2) ? "OBD-II" : "probing",
+                  (unsigned long)vehicle.pgnKnownCount,
+                  (unsigned long)vehicle.pgnUnknownCount,
+                  (unsigned long)obd2ResponsesCount());
   }
 }

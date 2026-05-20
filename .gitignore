@@ -1,4 +1,4 @@
-﻿# Claude Code local settings (per-user, not shared)
+# Claude Code local settings (per-user, not shared)
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 
@@ -23,3 +23,20 @@ firmware-canprobe_2/
 
 # Большие видео — выкладываем отдельно (не через git)
 about/*.mp4
+
+# .NET backend
+backend/bin/
+backend/obj/
+backend/publish/
+backend/*.db
+backend/*.db-journal
+backend/*.user
+
+# Vue frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/npm-debug.log*
+
+# Локальные конфиги симулятора
+tools/device-sim/node_modules/
