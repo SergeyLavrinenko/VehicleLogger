@@ -40,3 +40,5 @@ frontend/npm-debug.log*
 
 # Локальные конфиги симулятора
 tools/device-sim/node_modules/
+# Временные файлы генерации отчёта
+tools/_report_tmp/
