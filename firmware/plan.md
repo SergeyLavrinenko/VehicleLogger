@@ -52,7 +52,7 @@
 
 ### Этап 3 ✓ — Провизионинг (subdomain + 6-значный код) *(commits `06dced1`, `f4b0117`, `09699f8`, `aabde2e`)*
 
-Архитектура: мультитенантность через wildcard `*.example.com`. Каждая компания = поддомен. Установщик в captive portal вводит WiFi + поддомен + код, ESP сразу делает один POST `/api/devices/enroll`.
+Архитектура: мультитенантность через wildcard `*.nonconf.ru`. Каждая компания = поддомен. Установщик в captive portal вводит WiFi + поддомен + код, ESP сразу делает один POST `/api/devices/enroll`.
 
 - [x] Переписан `PROVISIONING.md` (subdomain + enrollment_codes вместо QR-claim)
 - [x] NVS-обёртка `nvs_store.{h,cpp}` (factory / wifi / cloud namespaces)
@@ -61,17 +61,19 @@
 - [x] Captive portal `data/setup.html` (~6 КБ): WiFi-скан + поддомен + код
 - [x] HTTPS POST `/api/devices/enroll` с маппингом 200/400/403/404/409/410
 - [x] Перенос декодеров J1939/OBD-II в `firmware/src/`
+- [x] DEV: 3-сек serial reset window в boot (любая клавиша → стереть wifi+cloud, оставить factory)
 
-### Этап 4 — Working mode + телеметрия *(ждёт backend)*
+### Этап 4 ✓ — Working mode + телеметрия *(commit `838adad`, Тимур)*
 
-- [ ] `wifi_manager.{h,cpp}` — connect from NVS, reconnect, fail-back в SoftAP при многократных потерях
-- [ ] CAN init с auto-baud/auto-proto в `MODE_WORKING` (адаптировать из `firmware-test/`)
-- [ ] `cloud::startTelemetry()` — POST `/api/telemetry` (Bearer api_key) с `VehicleData` каждые `sendIntervalMs`
-- [ ] Heartbeat `/api/device/ping` каждые 60 сек
+- [x] `wifi_manager.{h,cpp}` — connect from NVS + автоматический reconnect
+- [x] `can_module.{h,cpp}` — портирован auto-baud 500↔250↔500 + auto-protocol J1939 listen-only / OBD-II normal mode
+- [x] `cloud::sendTelemetry()` — POST `/api/telemetry` (Bearer api_key + UTC ISO timestamp через NTP) каждые `sendIntervalMs`
+- [x] `cloud::sendPing()` — heartbeat `/api/device/ping` каждые 60 сек
+- [x] Форс HTTPS-схемы в backendUrl (фикс под `X-Forwarded-Proto`, иначе WiFiClientSecure валится с SSL invalid record на 80 порту)
+- [x] `enterWorkingMode()` заполнен — periodic `[STAT]` лог с frames/baud/proto/responses/rssi
+- [x] `tools/monitor.py` + `monitor_noreset.py` — pyserial обёртки под Windows
 - [ ] Обработка 401 (ключ отозван) → стираем `cloud/api_key` → SoftAP
 - [ ] Обработка 410 (deactivated) → SoftAP
-
-Зависимости от Тимура: `/api/devices/enroll`, `/api/devices/{id}/unclaim`, `/api/devices/{id}/rotate-key`, `/api/enrollment-codes`, `/api/telemetry`, `/api/device/ping`.
 
 ### Этап 5 — GPS и IMU в основной firmware
 
@@ -82,7 +84,7 @@
 
 ### Этап 6 — Reset, LED, factory script
 
-- [ ] Кнопка GPIO 0 — 5 сек → `NvsStore::resetWifi()`, 10 сек → `NvsStore::factoryReset()` + restart
+- [ ] Кнопка GPIO 0 — 5 сек → `NvsStore::resetWifi()`, 10 сек → `NvsStore::factoryReset()` + restart (сейчас доступно через serial-window в boot — этап 3)
 - [ ] `led_status.{h,cpp}` — паттерны: 1 Гц SoftAP, 4 Гц connecting, постоянный working, double-flash error
 - [ ] `tools/factory_provision.py` — esptool + запись serial (из MAC) + 32-байтного secret в NVS-партицию + отправка `serial + sha256(secret)` на бэкенд
 
@@ -99,6 +101,15 @@
 - [ ] Канал обновлений на тенант (stable / beta)
 
 ---
+
+## Сопутствующая работа (вне firmware)
+
+- **Backend + Frontend** *(commit `56963d9`, Тимур)* — мультитенантный VehicleLogger:
+  - .NET 10 + EF Core + SQLite (`backend/`)
+  - Vue 3 + Vite (`frontend/`) с docs-страницами и device-management UI
+  - Endpoints: `/api/devices/{enroll,provision,claim,unclaim,rotate-key}`, `/api/telemetry`, `/api/device/ping`, `/api/enrollment-codes`, `/api/tenants`, `/api/vehicles/*`
+  - Live: nonconf.ru (super-admin) + wildcard `*.nonconf.ru` (тенанты)
+- **Симулятор устройства** `tools/device-sim/` — JS-эмулятор для тестов без железа
 
 ## Стек
 
@@ -123,14 +134,15 @@ firmware/
 ├── include/
 │   └── config.h             # пины + AP_PASSWORD + BASE_DOMAIN (без секретов)
 └── src/
-    ├── main.cpp             # boot state machine (provisioning ↔ working)
+    ├── main.cpp             # boot state machine + serialResetWindow + working loop
     ├── nvs_store.{h,cpp}    # обёртка Preferences (factory / wifi / cloud)
     ├── provisioning.{h,cpp} # SoftAP + DNS + captive portal + /api/setup
-    ├── cloud.{h,cpp}        # HTTPS POST /api/devices/enroll
+    ├── wifi_manager.{h,cpp} # connect from NVS + reconnect (этап 4)
+    ├── cloud.{h,cpp}        # HTTPS POST /enroll + sendTelemetry + ping
+    ├── can_module.{h,cpp}   # auto-baud/auto-proto в working mode (этап 4)
     ├── j1939.{h,cpp}        # декодер J1939 (этап 2)
     ├── obd2.{h,cpp}         # OBD-II поллер (этап 2)
     │
-    ├── wifi_manager.{h,cpp} # TODO этап 4
     ├── gps_reader.{h,cpp}   # TODO этап 5
     ├── imu_reader.{h,cpp}   # TODO этап 5
     └── led_status.{h,cpp}   # TODO этап 6
