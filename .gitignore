@@ -20,3 +20,6 @@ firmware-canlog/
 firmware-canprobe/
 firmware-canprobe-idf/
 firmware-canprobe_2/
+
+# Большие видео — выкладываем отдельно (не через git)
+about/*.mp4
