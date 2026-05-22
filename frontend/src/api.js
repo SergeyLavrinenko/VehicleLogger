@@ -38,6 +38,8 @@ export const apiCalls = {
   getTelemetry: (id, limit = 200)   => api.get(`/vehicles/${id}/telemetry`, { params: { limit } }).then(r => r.data),
   getAlerts:    (id)                => api.get(`/vehicles/${id}/alerts`).then(r => r.data),
   getRefuels:   (id)                => api.get(`/vehicles/${id}/refuels`).then(r => r.data),
+  getAiSummary: (id)                => api.get(`/vehicles/${id}/ai-summary`, { timeout: 90000 }).then(r => r.data),
+  regenerateAiSummary: (id)         => api.post(`/vehicles/${id}/ai-summary/regenerate`, null, { timeout: 90000 }).then(r => r.data),
   getDashboard: ()                  => api.get('/dashboard').then(r => r.data),
 
   getDevices:    (params)           => api.get('/devices', { params }).then(r => r.data),

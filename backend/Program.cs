@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using VehicleLogger.Api.Auth;
 using VehicleLogger.Api.Data;
 using VehicleLogger.Api.Endpoints;
+using VehicleLogger.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +17,7 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseSqlite(connectionString));
 
 builder.Services.AddSingleton<JwtIssuer>();
+builder.Services.AddHttpClient<OllamaClient>();
 
 var jwtKey      = builder.Configuration["Jwt:Key"]      ?? "";
 var jwtIssuer   = builder.Configuration["Jwt:Issuer"]   ?? "VehicleLogger";
@@ -85,5 +87,6 @@ app.MapProvisioningEndpoints();
 app.MapDeviceListEndpoints();
 app.MapEnrollmentEndpoints();
 app.MapTenantEndpoints();
+app.MapAiSummaryEndpoints();
 
 app.Run();

@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<Alert> Alerts => Set<Alert>();
     public DbSet<EnrollmentCode> EnrollmentCodes => Set<EnrollmentCode>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<AiSummary> AiSummaries => Set<AiSummary>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder cb)
     {
@@ -57,5 +58,8 @@ public class AppDbContext : DbContext
 
         b.Entity<Tenant>()
             .HasIndex(t => t.Subdomain).IsUnique();
+
+        b.Entity<AiSummary>()
+            .HasIndex(s => new { s.VehicleId, s.GeneratedAt });
     }
 }

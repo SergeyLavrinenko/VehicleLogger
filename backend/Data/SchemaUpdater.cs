@@ -43,7 +43,16 @@ public static class SchemaUpdater
             "ALTER TABLE Devices ADD COLUMN TenantId INTEGER NULL",
             "ALTER TABLE Vehicles ADD COLUMN TenantId INTEGER NULL",
             "ALTER TABLE Users ADD COLUMN TenantId INTEGER NULL",
-            "ALTER TABLE EnrollmentCodes ADD COLUMN TenantId INTEGER NULL"
+            "ALTER TABLE EnrollmentCodes ADD COLUMN TenantId INTEGER NULL",
+            @"CREATE TABLE IF NOT EXISTS AiSummaries (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                VehicleId INTEGER NOT NULL,
+                TenantId INTEGER NULL,
+                GeneratedAt TEXT NOT NULL,
+                Content TEXT NOT NULL DEFAULT '',
+                Model TEXT NULL
+            )",
+            "CREATE INDEX IF NOT EXISTS IX_AiSummaries_VehicleId_GeneratedAt ON AiSummaries(VehicleId, GeneratedAt)"
         };
         foreach (var sql in statements)
         {
