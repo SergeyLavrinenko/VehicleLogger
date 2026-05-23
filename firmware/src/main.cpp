@@ -23,6 +23,65 @@
 #include "gps_module.h"
 #include "mqtt_client.h"
 
+namespace SimMode {
+  static bool      s_active   = false;
+  static uint32_t  s_startMs  = 0;
+  static const uint32_t DURATION_MS = 120000;   // 2 минуты
+
+  void start() {
+    s_active  = true;
+    s_startMs = millis();
+    Serial.println(F("[SIM] >>> 2-min trip simulation STARTED"));
+  }
+
+  bool isActive() { return s_active; }
+
+  void tick(VehicleData& v) {
+    if (!s_active) return;
+    uint32_t now     = millis();
+    uint32_t elapsed = now - s_startMs;
+    if (elapsed > DURATION_MS) {
+      if (s_active) Serial.println(F("[SIM] <<< trip simulation ENDED — engine off"));
+      s_active = false;
+      v.rpm = 0; v.speed = 0;
+      v.ts_rpm = now; v.ts_speed = now;
+      return;
+    }
+    float t = elapsed / 1000.0f;
+    float speed, rpm;
+    if (t < 15.0f) {                   // 0..15 s: разгон 0→60
+      float k = t / 15.0f;
+      speed = 60.0f * k;
+      rpm   = 800.0f + 1400.0f * k;
+    } else if (t < 90.0f) {            // 15..90 s: круиз 60..80 с волнами
+      float phase = (t - 15.0f) / 75.0f;
+      speed = 70.0f + 10.0f * sinf(phase * 6.2832f * 2.0f);
+      rpm   = 2000.0f + 400.0f * sinf(phase * 6.2832f * 3.0f);
+    } else {                           // 90..120 s: торможение 60→0
+      float k = (t - 90.0f) / 30.0f;
+      speed = 60.0f * (1.0f - k);
+      rpm   = 2000.0f * (1.0f - k) + 800.0f * k;
+    }
+    v.rpm            = (uint16_t)rpm;
+    v.speed          = speed;
+    v.coolantTemp    = 60.0f + (t / 120.0f) * 30.0f;
+    v.fuelLevel      = 75.0f - (t / 120.0f) * 4.0f;
+    v.batteryVoltage = 13.8f - (rpm < 1000.0f ? 0.5f : 0.0f);
+    v.oilPressure    = 2.0f + rpm / 1500.0f;
+    v.engineLoad     = 25.0f + 55.0f * (speed / 80.0f);
+    v.fuelRate       = 4.0f + 11.0f * (speed / 80.0f);
+    v.ts_rpm = v.ts_speed = v.ts_coolant = v.ts_fuel = v.ts_voltage = now;
+    v.ts_oil = v.ts_load = v.ts_fuelRate = now;
+  }
+
+  void pollSerial() {
+    while (Serial.available()) {
+      int ch = Serial.read();
+      if (ch == 'S' || ch == 's') start();
+    }
+  }
+}
+
 enum BootMode { MODE_PROVISIONING, MODE_WORKING };
 
 static VehicleData g_vehicle;
@@ -162,6 +221,8 @@ void loop() {
   CanModule::tick();
   GpsModule::tick();
   MqttClient::loop();
+  SimMode::pollSerial();
+  SimMode::tick(g_vehicle);
 
   uint32_t now = millis();
 

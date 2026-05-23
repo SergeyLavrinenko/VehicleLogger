@@ -7,6 +7,15 @@ public class TelemetryRecord
     public int DeviceId { get; set; }
     public Device? Device { get; set; }
 
+    /// Снимок Device.VehicleId на момент приёма пакета. Если устройство
+    /// потом переставят в другую фуру или сделают factory reset — старые
+    /// пакеты останутся у предыдущей фуры.
+    public int? VehicleId { get; set; }
+    public Vehicle? Vehicle { get; set; }
+
+    /// Снимок текущего тенанта (для проверки границ при выборках).
+    public int? TenantId { get; set; }
+
     public DateTime Timestamp { get; set; }
 
     // ── CAN-параметры ─────────────────────────────────

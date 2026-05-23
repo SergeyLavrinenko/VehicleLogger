@@ -65,6 +65,17 @@ public static class SchemaUpdater
             "ALTER TABLE Telemetry ADD COLUMN TripId INTEGER NULL",
             "ALTER TABLE Telemetry ADD COLUMN OdometerKm REAL NULL",
             "CREATE INDEX IF NOT EXISTS IX_Telemetry_TripId ON Telemetry(TripId)",
+            // VehicleId/TenantId snapshot в TelemetryRecord — чтобы при перепривязке
+            // устройства старые пакеты оставались у прежнего тенанта/фуры.
+            "ALTER TABLE Telemetry ADD COLUMN VehicleId INTEGER NULL",
+            "ALTER TABLE Telemetry ADD COLUMN TenantId INTEGER NULL",
+            "CREATE INDEX IF NOT EXISTS IX_Telemetry_VehicleId_Timestamp ON Telemetry(VehicleId, Timestamp)",
+            // Однократный backfill: проставляем VehicleId/TenantId по ТЕКУЩЕМУ
+            // Device.VehicleId / Device.TenantId. После этого изменения Device.VehicleId
+            // на новые пакеты не повлияют.
+            "UPDATE Telemetry SET VehicleId = (SELECT VehicleId FROM Devices WHERE Devices.Id = Telemetry.DeviceId) WHERE VehicleId IS NULL",
+            "UPDATE Telemetry SET TenantId  = (SELECT TenantId  FROM Devices WHERE Devices.Id = Telemetry.DeviceId) WHERE TenantId  IS NULL",
+
 
             @"CREATE TABLE IF NOT EXISTS Trips (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,

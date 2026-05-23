@@ -45,6 +45,16 @@ public class AppDbContext : DbContext
             .HasIndex(t => t.TripId);
 
         b.Entity<TelemetryRecord>()
+            .HasIndex(t => new { t.VehicleId, t.Timestamp });
+
+        b.Entity<TelemetryRecord>()
+            .HasOne(t => t.Vehicle)
+            .WithMany()
+            .HasForeignKey(t => t.VehicleId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+
+        b.Entity<TelemetryRecord>()
             .HasOne(t => t.Device)
             .WithMany()
             .HasForeignKey(t => t.DeviceId)

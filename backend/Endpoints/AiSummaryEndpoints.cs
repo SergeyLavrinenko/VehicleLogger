@@ -162,7 +162,7 @@ public static class AiSummaryEndpoints
         if (v.Device is not null)
         {
             var telemetry = await db.Telemetry
-                .Where(t => t.DeviceId == v.Device.Id)
+                .Where(t => t.VehicleId == v.Id)
                 .OrderByDescending(t => t.Timestamp)
                 .Take(TelemetrySampleSize)
                 .ToListAsync(ct);

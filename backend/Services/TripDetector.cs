@@ -134,17 +134,19 @@ public class TripDetector
 
     public static bool IsActive(TelemetryRecord r)
     {
+        // GPS-скорость намеренно НЕ учитываем: NEO-M8N в стационарном
+        // состоянии нередко выдаёт мусор 50-150 км/ч из-за плавающего фикса.
+        // Надёжные признаки активности — обороты двигателя или CAN-скорость.
         var rpmActive = r.Rpm.HasValue && r.Rpm.Value > RpmActiveThreshold;
-        var gpsActive = r.GpsSpeed.HasValue && r.GpsSpeed.Value > GpsActiveThreshold;
         var canSpeedActive = r.Speed.HasValue && r.Speed.Value > GpsActiveThreshold;
-        return rpmActive || gpsActive || canSpeedActive;
+        return rpmActive || canSpeedActive;
     }
 
     public static bool IsIdle(TelemetryRecord r)
     {
+        // По той же причине: GPS из условия покоя выкинут.
         var rpmIdle = !r.Rpm.HasValue || r.Rpm.Value <= 0;
-        var gpsIdle = !r.GpsSpeed.HasValue || r.GpsSpeed.Value < GpsIdleThreshold;
         var canIdle = !r.Speed.HasValue || r.Speed.Value < GpsIdleThreshold;
-        return rpmIdle && gpsIdle && canIdle;
+        return rpmIdle && canIdle;
     }
 }

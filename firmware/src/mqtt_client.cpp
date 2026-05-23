@@ -91,7 +91,11 @@ namespace MqttClient {
   }
 
   bool isConnected() {
-    return s_enabled && s_client.connected();
+    if (!s_enabled) return false;
+    if (s_client.connected()) return true;
+    // Пробуем переподключиться сразу же — это чаще выгоднее чем уйти в HTTPS fallback
+    // на следующий цикл телеметрии (после ~5 сек паузы соединение точно протухнет).
+    return ensureConnected();
   }
 
   bool publishTelemetry(const String& json) {

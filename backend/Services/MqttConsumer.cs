@@ -157,6 +157,8 @@ public class MqttConsumer : BackgroundService
             var record = new TelemetryRecord
             {
                 DeviceId   = device.Id,
+                VehicleId  = device.VehicleId,
+                TenantId   = device.TenantId,
                 Timestamp  = ts,
                 Rpm        = req.Data.Rpm,
                 Speed      = req.Data.Speed,

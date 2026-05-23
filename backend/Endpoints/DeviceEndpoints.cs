@@ -50,6 +50,8 @@ public static class DeviceEndpoints
         var record = new TelemetryRecord
         {
             DeviceId    = device.Id,
+            VehicleId   = device.VehicleId,
+            TenantId    = device.TenantId,
             Timestamp   = timestamp,
             Rpm         = req.Data.Rpm,
             Speed       = req.Data.Speed,

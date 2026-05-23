@@ -76,7 +76,7 @@ public static class VehicleEndpoints
                     serialNumber = v.Device.SerialNumber
                 },
                 lastTelemetryAt = db.Telemetry
-                    .Where(t => v.Device != null && t.DeviceId == v.Device.Id)
+                    .Where(t => t.VehicleId == v.Id)
                     .OrderByDescending(t => t.Timestamp)
                     .Select(t => (DateTime?)t.Timestamp)
                     .FirstOrDefault()
@@ -99,7 +99,7 @@ public static class VehicleEndpoints
 
         var lastT = v.Device == null ? null
             : await db.Telemetry
-                .Where(t => t.DeviceId == v.Device.Id)
+                .Where(t => t.VehicleId == v.Id)
                 .OrderByDescending(t => t.Timestamp)
                 .Select(t => new
                 {
@@ -142,7 +142,7 @@ public static class VehicleEndpoints
         if (tenantId is not null && v.TenantId != tenantId) return Results.Ok(Array.Empty<object>());
 
         limit = Math.Clamp(limit, 1, 2000);
-        var q = db.Telemetry.Where(t => t.DeviceId == v.Device.Id);
+        var q = db.Telemetry.Where(t => t.VehicleId == v.Id);
         if (from is not null) q = q.Where(t => t.Timestamp >= from);
         if (to   is not null) q = q.Where(t => t.Timestamp <= to);
 
