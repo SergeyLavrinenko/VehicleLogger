@@ -75,27 +75,71 @@
 - [ ] Обработка 401 (ключ отозван) → стираем `cloud/api_key` → SoftAP
 - [ ] Обработка 410 (deactivated) → SoftAP
 
-### Этап 5 — GPS и IMU в основной firmware
+### Этап 5 ✓ — GPS, MQTT-телеметрия, автоматические поездки
 
-- [ ] `gps_reader.{h,cpp}` — UART2 + TinyGPSPlus (адаптировать из `firmware-test/`)
+GPS-данные снимаются с NEO-M8N и идут в пакет телеметрии. Backend
+автоматически формирует поездки по эвристике RPM+GPS с гистерезисом,
+считает три независимых оценки пробега (Haversine GPS, разность J1939-
+одометра, интеграл CAN-скорости). На фронте — карта трека (Leaflet+OSM)
+и список поездок с пагинацией. Передача телеметрии переключена на MQTT
+(Mosquitto на mqtt.nonconf.ru, TLS 8883, QoS 1), HTTPS оставлен как
+fallback для симулятора.
+
+Прошивка:
+- [x] `gps_module.{h,cpp}` — UART2 + TinyGPSPlus, Snapshot(maxAgeMs)
+- [x] `mqtt_client.{h,cpp}` — PubSubClient + WiFiClientSecure, QoS 1,
+      reconnect, топики `vl/{tenant}/{serial}/{telemetry,ping}`
+- [x] `nvs_store.{h,cpp}` — поля `cloud/mqtt_host`, `mqtt_port`, `mqtt_en`
+- [x] `cloud.cpp` — parse `mqttBroker/mqttPort/mqttEnabled` из enroll-
+      ответа, при подключённом MQTT publish вместо HTTPS POST
+- [x] `main.cpp` — GpsModule::tick() и MqttClient::loop() в цикле,
+      `gpsAgeMs` и `mqtt=on/off` в строке `[STAT]`
+
+Backend:
+- [x] Колонки `Lat/Lng/Altitude/GpsSpeed/Course/Satellites/GpsFix/
+      TripId/OdometerKm` в `Telemetry`, дедуп-индекс `(DeviceId,
+      Timestamp)`, миграция через `SchemaUpdater`
+- [x] Модель `Trip` (3 оценки пробега, агрегаты RPM/Speed/Fuel, DTC,
+      точки старта/финиша)
+- [x] `TripDetector` с гистерезисом 30 с активности / 5 мин покоя,
+      `TripStatsCalculator` с защитой от ложного расхода при
+      заправке, `TripCloserWorker` (15-мин таймаут обрыва связи)
+- [x] `TripEndpoints`: list/details/track + флаг `gpsSpoofSuspect`
+- [x] `MqttConsumer` (BackgroundService с MQTTnet), `MosquittoUserManager`
+      (bcrypt-пароли в passwd-файл + reload)
+- [x] `EnrollmentEndpoints` отвечает `mqttBroker/mqttPort/mqttEnabled`
+
+Frontend:
+- [x] `leaflet@^1.9` + `TripMap.vue` (polyline OSM-tiles, маркеры S/F)
+- [x] `TripCard.vue` — карточка с агрегатами и значком возможного
+      спуфинга GPS
+- [x] `TripsTab.vue` — список с пагинацией, при клике — карта и детали
+- [x] Секция «Поездки» в `VehicleDetails.vue` между графиками и журналом
+
+Инфраструктура: `infra/mosquitto/{mosquitto.conf, acl, README.md}`,
+отладочный скрипт `tools/mqtt_listen.py`. IMU-интеграция (MPU-6050)
+вынесена в отдельный этап.
+
+### Этап 6 — IMU в основной firmware
+
 - [ ] `imu_reader.{h,cpp}` — MPU-6050 через `Wire` (адаптировать из `firmware-test/`)
 - [ ] Детекция событий IMU: резкое торможение (ax < -0.6g), удар (sqrt(a²) > 2g)
-- [ ] Добавить координаты + IMU-snapshot в пакет телеметрии
+- [ ] Добавить IMU-snapshot в пакет телеметрии и алерты в backend
 
-### Этап 6 — Reset, LED, factory script
+### Этап 7 — Reset, LED, factory script
 
 - [ ] Кнопка GPIO 0 — 5 сек → `NvsStore::resetWifi()`, 10 сек → `NvsStore::factoryReset()` + restart (сейчас доступно через serial-window в boot — этап 3)
 - [ ] `led_status.{h,cpp}` — паттерны: 1 Гц SoftAP, 4 Гц connecting, постоянный working, double-flash error
 - [ ] `tools/factory_provision.py` — esptool + запись serial (из MAC) + 32-байтного secret в NVS-партицию + отправка `serial + sha256(secret)` на бэкенд
 
-### Этап 7 — Буферизация и надёжность
+### Этап 8 — Буферизация и надёжность
 
 - [ ] LittleFS-буфер при потере WiFi (ring-buffer телеметрии, ~1 час истории)
 - [ ] Повторная отправка при восстановлении связи
 - [ ] Watchdog timer (`esp_task_wdt`)
 - [ ] Защита от bus-off на CAN (auto-recover из firmware-test/ уже работает)
 
-### Этап 8 — OTA-обновление *(отдельный документ)*
+### Этап 9 — OTA-обновление *(отдельный документ)*
 
 - [ ] HTTPS OTA с проверкой подписи прошивки
 - [ ] Канал обновлений на тенант (stable / beta)

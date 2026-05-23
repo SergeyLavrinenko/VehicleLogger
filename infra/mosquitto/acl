@@ -1,0 +1,14 @@
+# ACL Mosquitto — VehicleLogger
+# Шаблон: каждое устройство может публиковать ТОЛЬКО в собственные топики,
+# где %u — это username клиента (равен серийному номеру устройства).
+# Топики имеют форму  vl/{tenant}/{serial}/telemetry|ping
+
+# 1) Backend (имя из appsettings.json -> Mqtt:Username) — полный доступ
+user vl-backend
+topic readwrite vl/#
+
+# 2) Устройства — публикация только в свой канал
+pattern write vl/+/%u/telemetry
+pattern write vl/+/%u/ping
+# Будущая возможность: backend → устройство (команды).
+pattern read  vl/+/%u/cmd
