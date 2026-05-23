@@ -42,3 +42,4 @@ frontend/npm-debug.log*
 tools/device-sim/node_modules/
 # Временные файлы генерации отчёта
 tools/_report_tmp/
+about/Титул.docx
