@@ -93,8 +93,7 @@ namespace MqttClient {
   bool isConnected() {
     if (!s_enabled) return false;
     if (s_client.connected()) return true;
-    // Пробуем переподключиться сразу же — это чаще выгоднее чем уйти в HTTPS fallback
-    // на следующий цикл телеметрии (после ~5 сек паузы соединение точно протухнет).
+    // Если keepalive протух — переподключимся прямо сейчас, чтобы не уходить в HTTPS-fallback.
     return ensureConnected();
   }
 

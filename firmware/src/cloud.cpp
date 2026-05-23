@@ -198,6 +198,13 @@ namespace Cloud {
     String payload;
     serializeJson(doc, payload);
 
+    // MQTT-канал: если подключён — публикуем туда и не ходим в HTTP.
+    if (MqttClient::isConnected()) {
+      http.end();  // отпускаем HTTPS-клиент, не отправляем запрос
+      bool ok = MqttClient::publishTelemetry(payload);
+      return ok ? PostResult::Ok : PostResult::NetworkError;
+    }
+
     int code = http.POST(payload);
     String rs = http.getString();
     http.end();
@@ -243,6 +250,12 @@ namespace Cloud {
 
     String payload;
     serializeJson(doc, payload);
+
+    if (MqttClient::isConnected()) {
+      http.end();
+      bool ok = MqttClient::publishPing(payload);
+      return ok ? PostResult::Ok : PostResult::NetworkError;
+    }
 
     int code = http.POST(payload);
     http.end();
