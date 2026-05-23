@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using VehicleLogger.Api.Data;
 using VehicleLogger.Api.Dtos;
 using VehicleLogger.Api.Models;
+using VehicleLogger.Api.Services;
 
 namespace VehicleLogger.Api.Endpoints;
 
@@ -22,6 +23,7 @@ public static class DeviceEndpoints
         HttpContext ctx,
         TelemetryRequest req,
         AppDbContext db,
+        TripDetector tripDetector,
         ILoggerFactory loggerFactory)
     {
         var log = loggerFactory.CreateLogger("Telemetry");
@@ -36,32 +38,55 @@ public static class DeviceEndpoints
         if (req.Timestamp == default)
             return Results.BadRequest(new { error = "timestamp_required" });
 
+        var timestamp = req.Timestamp.ToUniversalTime();
+
+        // Дедупликация: при QoS-1 MQTT-ретраях или повторе HTTPS-запроса
+        // тот же (DeviceId, Timestamp) приходит дважды. Считаем дубль успехом.
+        var alreadyExists = await db.Telemetry
+            .AnyAsync(t => t.DeviceId == device.Id && t.Timestamp == timestamp);
+        if (alreadyExists)
+            return Results.Ok(new { stored = false, reason = "duplicate" });
+
         var record = new TelemetryRecord
         {
-            DeviceId = device.Id,
-            Timestamp = req.Timestamp.ToUniversalTime(),
-            Rpm = req.Data.Rpm,
-            Speed = req.Data.Speed,
+            DeviceId    = device.Id,
+            Timestamp   = timestamp,
+            Rpm         = req.Data.Rpm,
+            Speed       = req.Data.Speed,
             CoolantTemp = req.Data.CoolantTemp,
             OilPressure = req.Data.OilPressure,
-            FuelLevel = req.Data.FuelLevel,
-            Voltage = req.Data.Voltage,
+            FuelLevel   = req.Data.FuelLevel,
+            Voltage     = req.Data.Voltage,
             DtcCodesJson = JsonSerializer.Serialize(req.Data.DtcCodes ?? new List<string>()),
+            OdometerKm  = req.Data.Odometer,
+            // GPS
+            Lat        = req.Gps?.Lat,
+            Lng        = req.Gps?.Lng,
+            Altitude   = req.Gps?.Alt,
+            GpsSpeed   = req.Gps?.Speed,
+            Course     = req.Gps?.Course,
+            Satellites = req.Gps?.Sats,
+            GpsFix     = req.Gps?.Fix,
             ReceivedAt = DateTime.UtcNow
         };
 
         db.Telemetry.Add(record);
 
-        device.IsOnline = true;
+        device.IsOnline   = true;
         device.LastPingAt = DateTime.UtcNow;
 
         await db.SaveChangesAsync();
 
-        log.LogInformation(
-            "Telemetry stored: device={Serial} ts={Ts} rpm={Rpm} speed={Speed}",
-            device.SerialNumber, record.Timestamp, record.Rpm, record.Speed);
+        // Детектор поездки видит свежесохранённый пакет; может открыть или закрыть Trip
+        // и проставить TripId записи.
+        await tripDetector.ProcessAsync(record, device);
 
-        return Results.Ok(new { stored = true, id = record.Id });
+        log.LogInformation(
+            "Telemetry stored: device={Serial} ts={Ts} rpm={Rpm} speed={Speed} gps={HasGps}",
+            device.SerialNumber, record.Timestamp, record.Rpm, record.Speed,
+            record.Lat.HasValue);
+
+        return Results.Ok(new { stored = true, id = record.Id, tripId = record.TripId });
     }
 
     private static async Task<IResult> HandlePing(

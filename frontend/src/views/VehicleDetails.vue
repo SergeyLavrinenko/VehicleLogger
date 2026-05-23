@@ -3,6 +3,7 @@ import { computed, ref, onMounted } from 'vue'
 import { apiCalls } from '../api'
 import { usePolling } from '../composables/usePolling'
 import MiniChart from '../components/MiniChart.vue'
+import TripsTab from '../components/TripsTab.vue'
 
 const props = defineProps({ id: { type: [String, Number], required: true } })
 
@@ -219,6 +220,11 @@ function fmtRelative(ts) {
         <MiniChart label="Топливо"        unit="%"    color="#db6d28" :points="fuelPoints" :y-min="0" :y-max="100" />
         <MiniChart label="Напряжение"     unit="В"    color="#f85149" :points="voltPoints" :y-min="11" :y-max="15" />
       </div>
+    </section>
+
+    <!-- Поездки -->
+    <section class="section">
+      <TripsTab :vehicle-id="vehicle.id" />
     </section>
 
     <!-- Журнал + Алерты + Заправки -->

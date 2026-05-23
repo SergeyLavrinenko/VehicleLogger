@@ -5,6 +5,8 @@ public class TelemetryRequest
     public string DeviceId { get; set; } = "";
     public DateTime Timestamp { get; set; }
     public TelemetryData Data { get; set; } = new();
+    /// GPS-снимок. Отсутствует целиком, если фикс старый или приёмник не дал данных.
+    public GpsData? Gps { get; set; }
 }
 
 public class TelemetryData
@@ -16,4 +18,8 @@ public class TelemetryData
     public double? FuelLevel { get; set; }
     public double? Voltage { get; set; }
     public List<string>? DtcCodes { get; set; }
+
+    /// Одометр J1939 PGN 65248, км. Передаётся отдельно от gps.speed —
+    /// нужен для альтернативной оценки пробега поездки.
+    public double? Odometer { get; set; }
 }

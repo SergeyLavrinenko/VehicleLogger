@@ -19,6 +19,11 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
 builder.Services.AddSingleton<JwtIssuer>();
 builder.Services.AddHttpClient<OllamaClient>();
 
+// Сервисы детектирования и закрытия поездок
+builder.Services.AddScoped<TripStatsCalculator>();
+builder.Services.AddScoped<TripDetector>();
+builder.Services.AddHostedService<TripCloserWorker>();
+
 var jwtKey      = builder.Configuration["Jwt:Key"]      ?? "";
 var jwtIssuer   = builder.Configuration["Jwt:Issuer"]   ?? "VehicleLogger";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "VehicleLogger.Api";
@@ -88,5 +93,6 @@ app.MapDeviceListEndpoints();
 app.MapEnrollmentEndpoints();
 app.MapTenantEndpoints();
 app.MapAiSummaryEndpoints();
+app.MapTripEndpoints();
 
 app.Run();

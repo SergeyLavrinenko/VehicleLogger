@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<EnrollmentCode> EnrollmentCodes => Set<EnrollmentCode>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<AiSummary> AiSummaries => Set<AiSummary>();
+    public DbSet<Trip> Trips => Set<Trip>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder cb)
     {
@@ -37,13 +38,23 @@ public class AppDbContext : DbContext
             .OnDelete(DeleteBehavior.SetNull);
 
         b.Entity<TelemetryRecord>()
-            .HasIndex(t => new { t.DeviceId, t.Timestamp });
+            .HasIndex(t => new { t.DeviceId, t.Timestamp })
+            .IsUnique();   // дедупликация по (device, timestamp) при MQTT QoS-1 ретраях
+
+        b.Entity<TelemetryRecord>()
+            .HasIndex(t => t.TripId);
 
         b.Entity<TelemetryRecord>()
             .HasOne(t => t.Device)
             .WithMany()
             .HasForeignKey(t => t.DeviceId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        b.Entity<TelemetryRecord>()
+            .HasOne(t => t.Trip)
+            .WithMany()
+            .HasForeignKey(t => t.TripId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         b.Entity<Alert>()
             .HasIndex(a => new { a.VehicleId, a.Timestamp });
@@ -61,5 +72,22 @@ public class AppDbContext : DbContext
 
         b.Entity<AiSummary>()
             .HasIndex(s => new { s.VehicleId, s.GeneratedAt });
+
+        b.Entity<Trip>()
+            .HasIndex(t => new { t.VehicleId, t.StartedAt });
+        b.Entity<Trip>()
+            .HasIndex(t => new { t.DeviceId, t.Status });
+
+        b.Entity<Trip>()
+            .HasOne(t => t.Vehicle)
+            .WithMany()
+            .HasForeignKey(t => t.VehicleId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        b.Entity<Trip>()
+            .HasOne(t => t.Device)
+            .WithMany()
+            .HasForeignKey(t => t.DeviceId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

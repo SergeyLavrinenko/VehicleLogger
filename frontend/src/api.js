@@ -56,5 +56,10 @@ export const apiCalls = {
   getAuthContext:      ()           => api.get('/auth/context').then(r => r.data),
   listTenants:         ()           => api.get('/tenants').then(r => r.data),
   createTenant:        (body)       => api.post('/tenants', body).then(r => r.data),
-  deleteTenant:        (id)         => api.delete(`/tenants/${id}`).then(r => r.data)
+  deleteTenant:        (id)         => api.delete(`/tenants/${id}`).then(r => r.data),
+
+  listTrips:    (vehicleId, skip = 0, take = 20) =>
+    api.get(`/vehicles/${vehicleId}/trips`, { params: { skip, take } }).then(r => r.data),
+  getTrip:      (tripId)            => api.get(`/trips/${tripId}`).then(r => r.data),
+  getTripTrack: (tripId)            => api.get(`/trips/${tripId}/track`).then(r => r.data)
 }

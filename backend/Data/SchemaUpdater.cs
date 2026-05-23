@@ -52,7 +52,51 @@ public static class SchemaUpdater
                 Content TEXT NOT NULL DEFAULT '',
                 Model TEXT NULL
             )",
-            "CREATE INDEX IF NOT EXISTS IX_AiSummaries_VehicleId_GeneratedAt ON AiSummaries(VehicleId, GeneratedAt)"
+            "CREATE INDEX IF NOT EXISTS IX_AiSummaries_VehicleId_GeneratedAt ON AiSummaries(VehicleId, GeneratedAt)",
+
+            // ── GPS + поездки ────────────────────────────────────────────
+            "ALTER TABLE Telemetry ADD COLUMN Lat REAL NULL",
+            "ALTER TABLE Telemetry ADD COLUMN Lng REAL NULL",
+            "ALTER TABLE Telemetry ADD COLUMN Altitude REAL NULL",
+            "ALTER TABLE Telemetry ADD COLUMN GpsSpeed REAL NULL",
+            "ALTER TABLE Telemetry ADD COLUMN Course REAL NULL",
+            "ALTER TABLE Telemetry ADD COLUMN Satellites INTEGER NULL",
+            "ALTER TABLE Telemetry ADD COLUMN GpsFix INTEGER NULL",
+            "ALTER TABLE Telemetry ADD COLUMN TripId INTEGER NULL",
+            "ALTER TABLE Telemetry ADD COLUMN OdometerKm REAL NULL",
+            "CREATE INDEX IF NOT EXISTS IX_Telemetry_TripId ON Telemetry(TripId)",
+
+            @"CREATE TABLE IF NOT EXISTS Trips (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                VehicleId INTEGER NULL,
+                DeviceId INTEGER NOT NULL,
+                TenantId INTEGER NULL,
+                StartedAt TEXT NOT NULL,
+                EndedAt TEXT NULL,
+                LastActivityAt TEXT NOT NULL,
+                Status INTEGER NOT NULL DEFAULT 0,
+                DurationSec INTEGER NOT NULL DEFAULT 0,
+                PointCount INTEGER NOT NULL DEFAULT 0,
+                DistanceGpsKm REAL NULL,
+                DistanceOdoKm REAL NULL,
+                DistanceSpeedKm REAL NULL,
+                AvgSpeed REAL NULL,
+                MaxSpeed REAL NULL,
+                AvgRpm REAL NULL,
+                MaxRpm REAL NULL,
+                FuelStartPercent REAL NULL,
+                FuelEndPercent REAL NULL,
+                FuelUsedPercent REAL NULL,
+                StartLat REAL NULL,
+                StartLng REAL NULL,
+                EndLat REAL NULL,
+                EndLng REAL NULL,
+                DtcCodesJson TEXT NOT NULL DEFAULT '[]',
+                OdoStartKm REAL NULL,
+                OdoEndKm REAL NULL
+            )",
+            "CREATE INDEX IF NOT EXISTS IX_Trips_VehicleId_StartedAt ON Trips(VehicleId, StartedAt)",
+            "CREATE INDEX IF NOT EXISTS IX_Trips_DeviceId_Status ON Trips(DeviceId, Status)"
         };
         foreach (var sql in statements)
         {
