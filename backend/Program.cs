@@ -24,6 +24,10 @@ builder.Services.AddScoped<TripStatsCalculator>();
 builder.Services.AddScoped<TripDetector>();
 builder.Services.AddHostedService<TripCloserWorker>();
 
+// MQTT (опционально, см. секцию Mqtt в appsettings)
+builder.Services.AddSingleton<MosquittoUserManager>();
+builder.Services.AddHostedService<MqttConsumer>();
+
 var jwtKey      = builder.Configuration["Jwt:Key"]      ?? "";
 var jwtIssuer   = builder.Configuration["Jwt:Issuer"]   ?? "VehicleLogger";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "VehicleLogger.Api";

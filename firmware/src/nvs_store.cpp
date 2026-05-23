@@ -113,6 +113,37 @@ namespace NvsStore {
     prefs.end();
   }
 
+
+  String getMqttBroker() {
+    String s; readKey("cloud", "mqtt_host", s);
+    return s;
+  }
+  void setMqttBroker(const String& host) { writeKey("cloud", "mqtt_host", host); }
+
+  uint16_t getMqttPort(uint16_t fallback) {
+    prefs.begin("cloud", true);
+    uint16_t v = (uint16_t)prefs.getUShort("mqtt_port", fallback);
+    prefs.end();
+    return v;
+  }
+  void setMqttPort(uint16_t port) {
+    prefs.begin("cloud", false);
+    prefs.putUShort("mqtt_port", port);
+    prefs.end();
+  }
+
+  bool getMqttEnabled(bool fallback) {
+    prefs.begin("cloud", true);
+    bool v = prefs.getBool("mqtt_en", fallback);
+    prefs.end();
+    return v;
+  }
+  void setMqttEnabled(bool en) {
+    prefs.begin("cloud", false);
+    prefs.putBool("mqtt_en", en);
+    prefs.end();
+  }
+
   // ── Reset ──────────────────────────────────
   void resetWifi()      { clearWifi(); }
   void resetCloud()     { clearNamespace("cloud"); }

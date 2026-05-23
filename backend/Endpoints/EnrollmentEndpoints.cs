@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using VehicleLogger.Api.Auth;
 using VehicleLogger.Api.Data;
 using VehicleLogger.Api.Models;
+using VehicleLogger.Api.Services;
 
 namespace VehicleLogger.Api.Endpoints;
 
@@ -28,7 +29,8 @@ public static class EnrollmentEndpoints
     public record EnrollRequest(string SerialNumber, string DeviceSecret, string EnrollCode);
 
     private static async Task<IResult> HandleEnroll(
-        EnrollRequest req, AppDbContext db, HttpContext ctx, ILoggerFactory loggerFactory)
+        EnrollRequest req, AppDbContext db, HttpContext ctx,
+        ILoggerFactory loggerFactory, MosquittoUserManager mqttUsers, IConfiguration cfg)
     {
         var log = loggerFactory.CreateLogger("Enroll");
 
@@ -88,14 +90,24 @@ public static class EnrollmentEndpoints
 
         await db.SaveChangesAsync();
 
+        // Регистрируем пароль устройства в Mosquitto, если MQTT включён в конфиге.
+        // При выключенном — метод тихо ничего не делает.
+        await mqttUsers.SetPasswordAsync(device.SerialNumber, apiKey);
+
         var backendUrl = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+        var mqttBroker = cfg["Mqtt:DeviceBrokerHost"];
+        var mqttPort   = cfg.GetValue<int?>("Mqtt:DeviceBrokerPort");
+        var mqttEnabled = cfg.GetValue<bool>("Mqtt:Enabled");
         log.LogInformation("enroll success {Serial} → device {Id}", req.SerialNumber, device.Id);
 
         return Results.Ok(new
         {
             apiKey,
             backendUrl,
-            sendIntervalMs = SendIntervalMs
+            sendIntervalMs = SendIntervalMs,
+            mqttBroker,
+            mqttPort,
+            mqttEnabled
         });
     }
 

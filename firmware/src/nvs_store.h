@@ -36,6 +36,15 @@ namespace NvsStore {
   uint32_t getSendIntervalMs(uint32_t fallback = 5000);
   void     setSendIntervalMs(uint32_t ms);
 
+
+  // ── MQTT (опционально, получаем при /enroll) ────────
+  String   getMqttBroker();
+  void     setMqttBroker(const String& host);
+  uint16_t getMqttPort(uint16_t fallback = 8883);
+  void     setMqttPort(uint16_t port);
+  bool     getMqttEnabled(bool fallback = false);
+  void     setMqttEnabled(bool en);
+
   // ── Reset ──────────────────────────────────
   void resetWifi();         // 5-сек reset: только wifi/*
   void resetCloud();         // стирает cloud/*

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using VehicleLogger.Api.Auth;
 using VehicleLogger.Api.Data;
 using VehicleLogger.Api.Models;
+using VehicleLogger.Api.Services;
 
 namespace VehicleLogger.Api.Endpoints;
 
@@ -113,7 +114,7 @@ public static class ProvisioningEndpoints
         });
     }
 
-    private static async Task<IResult> HandleUnclaim(int id, AppDbContext db, ClaimsPrincipal user)
+    private static async Task<IResult> HandleUnclaim(int id, AppDbContext db, ClaimsPrincipal user, MosquittoUserManager mqttUsers)
     {
         var tenantId = user.GetTenantId();
         var device = await db.Devices.FindAsync(id);
@@ -126,6 +127,7 @@ public static class ProvisioningEndpoints
         device.ClaimedAt = null;
         device.IsOnline  = false;
         await db.SaveChangesAsync();
+        await mqttUsers.RemoveUserAsync(device.SerialNumber);
         return Results.Ok(new { status = "manufactured" });
     }
 
@@ -156,7 +158,7 @@ public static class ProvisioningEndpoints
         return Results.Ok(new { deviceId = device.Id, vehicleId = device.VehicleId });
     }
 
-    private static async Task<IResult> HandleRotateKey(int id, AppDbContext db, ClaimsPrincipal user)
+    private static async Task<IResult> HandleRotateKey(int id, AppDbContext db, ClaimsPrincipal user, MosquittoUserManager mqttUsers)
     {
         var tenantId = user.GetTenantId();
         var device = await db.Devices.FindAsync(id);
@@ -168,6 +170,7 @@ public static class ProvisioningEndpoints
         device.ApiKey = GenerateApiKey();
         device.Status = DeviceStatus.Claimed;
         await db.SaveChangesAsync();
+        await mqttUsers.SetPasswordAsync(device.SerialNumber, device.ApiKey);
         return Results.Ok(new { rotated = true });
     }
 

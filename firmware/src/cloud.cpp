@@ -2,6 +2,7 @@
 #include "config.h"
 #include "nvs_store.h"
 #include "gps_module.h"
+#include "mqtt_client.h"
 
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
@@ -59,6 +60,18 @@ namespace Cloud {
       if (!outApiKey.length() || !outBackendUrl.length()) {
         Serial.println("[CLOUD] 200 but missing apiKey/backendUrl");
         return EnrollStatus::UnknownError;
+      }
+      // MQTT-параметры — опциональные, выдаются только если на сервере включён брокер
+      String mqttHost = doc["mqttBroker"].as<String>();
+      uint16_t mqttPort = (uint16_t)(doc["mqttPort"] | 0);
+      bool mqttEnabled = doc["mqttEnabled"] | false;
+      if (mqttEnabled && mqttHost.length() && mqttPort > 0) {
+        NvsStore::setMqttBroker(mqttHost);
+        NvsStore::setMqttPort(mqttPort);
+        NvsStore::setMqttEnabled(true);
+        Serial.printf("[CLOUD] MQTT enabled: %s:%u\n", mqttHost.c_str(), (unsigned)mqttPort);
+      } else {
+        NvsStore::setMqttEnabled(false);
       }
       return EnrollStatus::Ok;
     }

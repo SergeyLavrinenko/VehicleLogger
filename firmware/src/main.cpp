@@ -21,6 +21,7 @@
 #include "j1939.h"
 #include "obd2.h"
 #include "gps_module.h"
+#include "mqtt_client.h"
 
 enum BootMode { MODE_PROVISIONING, MODE_WORKING };
 
@@ -88,6 +89,10 @@ static void enterWorkingMode() {
 
   CanModule::begin(&g_vehicle);
 
+  // MQTT — если NVS говорит что включён, поднимаем клиент;
+  // иначе fallback в Cloud::* по HTTPS остаётся в силе.
+  MqttClient::begin();
+
   // Принудительный первый пинг чтобы LastPingAt появился сразу.
   Cloud::ping();
   g_lastPingMs = millis();
@@ -142,6 +147,7 @@ void loop() {
     if (WifiManager::connectFromNvs(15000)) {
       CanModule::begin(&g_vehicle);
       g_telemetryIntervalMs = NvsStore::getSendIntervalMs(5000);
+      MqttClient::begin();
       Cloud::ping();
       g_lastPingMs   = millis();
       g_workingReady = true;
@@ -155,6 +161,7 @@ void loop() {
   WifiManager::ensureConnected();
   CanModule::tick();
   GpsModule::tick();
+  MqttClient::loop();
 
   uint32_t now = millis();
 
@@ -180,7 +187,8 @@ void loop() {
                   (unsigned long)g_vehicle.pgnUnknownCount,
                   (unsigned long)obd2ResponsesCount(),
                   (int)WiFi.RSSI(),
-                  (unsigned long)GpsModule::lastFixAgeMs());
+                  (unsigned long)GpsModule::lastFixAgeMs(),
+                  MqttClient::isConnected() ? "on" : "off");
   }
 
   delay(20);
