@@ -20,6 +20,7 @@
 #include "can_module.h"
 #include "j1939.h"
 #include "obd2.h"
+#include "gps_module.h"
 
 enum BootMode { MODE_PROVISIONING, MODE_WORKING };
 
@@ -111,6 +112,8 @@ void setup() {
   NvsStore::begin();
   NvsStore::bringUpFactoryDefaults();
 
+  GpsModule::begin();   // GPS поднимаем сразу — фикс может занять минуты
+
   Serial.printf("[NVS] Serial: %s\n", NvsStore::getSerial().c_str());
   Serial.printf("[NVS] Secret(hex): %s\n", NvsStore::getSecretHex().c_str());
 
@@ -151,6 +154,7 @@ void loop() {
 
   WifiManager::ensureConnected();
   CanModule::tick();
+  GpsModule::tick();
 
   uint32_t now = millis();
 
@@ -175,7 +179,8 @@ void loop() {
                   (unsigned long)g_vehicle.pgnKnownCount,
                   (unsigned long)g_vehicle.pgnUnknownCount,
                   (unsigned long)obd2ResponsesCount(),
-                  (int)WiFi.RSSI());
+                  (int)WiFi.RSSI(),
+                  (unsigned long)GpsModule::lastFixAgeMs());
   }
 
   delay(20);

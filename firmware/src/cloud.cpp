@@ -1,6 +1,7 @@
 #include "cloud.h"
 #include "config.h"
 #include "nvs_store.h"
+#include "gps_module.h"
 
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
@@ -168,6 +169,19 @@ namespace Cloud {
       }
     }
 
+    // GPS-снимок: добавляем только если фикс свежий (≤10 секунд)
+    GpsModule::Snapshot gps = GpsModule::snapshot(10000);
+    if (gps.valid) {
+      JsonObject g = doc["gps"].to<JsonObject>();
+      g["lat"]    = gps.lat;
+      g["lng"]    = gps.lng;
+      g["alt"]    = gps.altitudeM;
+      g["speed"]  = gps.speedKmh;
+      g["course"] = gps.courseDeg;
+      g["sats"]   = gps.satellites;
+      g["fix"]    = gps.fix;
+    }
+
     String payload;
     serializeJson(doc, payload);
 
@@ -201,6 +215,19 @@ namespace Cloud {
 
     JsonDocument doc;
     doc["deviceId"] = NvsStore::getSerial();
+    // GPS-снимок: добавляем только если фикс свежий (≤10 секунд)
+    GpsModule::Snapshot gps = GpsModule::snapshot(10000);
+    if (gps.valid) {
+      JsonObject g = doc["gps"].to<JsonObject>();
+      g["lat"]    = gps.lat;
+      g["lng"]    = gps.lng;
+      g["alt"]    = gps.altitudeM;
+      g["speed"]  = gps.speedKmh;
+      g["course"] = gps.courseDeg;
+      g["sats"]   = gps.satellites;
+      g["fix"]    = gps.fix;
+    }
+
     String payload;
     serializeJson(doc, payload);
 
