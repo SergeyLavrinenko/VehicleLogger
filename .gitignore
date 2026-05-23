@@ -14,6 +14,9 @@ firmware/build/
 # Secrets
 firmware/include/secrets.h
 firmware-test/include/config.h
+backend/appsettings.Development.json
+backend/appsettings.Production.json
+backend/appsettings.Local.json
 
 # Диагностические/экспериментальные прошивки (Этап 1) — в репозиторий не идут
 firmware-canlog/
