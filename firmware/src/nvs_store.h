@@ -45,6 +45,10 @@ namespace NvsStore {
   bool     getMqttEnabled(bool fallback = false);
   void     setMqttEnabled(bool en);
 
+  // ── Power-cycle counter (для тройного reset без кнопки) ─
+  uint8_t  getBootCycles(uint8_t fallback = 0);
+  void     setBootCycles(uint8_t n);
+
   // ── Reset ──────────────────────────────────
   void resetWifi();         // 5-сек reset: только wifi/*
   void resetCloud();         // стирает cloud/*

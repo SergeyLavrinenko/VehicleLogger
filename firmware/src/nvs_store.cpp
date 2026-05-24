@@ -144,6 +144,19 @@ namespace NvsStore {
     prefs.end();
   }
 
+
+  uint8_t getBootCycles(uint8_t fallback) {
+    prefs.begin("boot", true);
+    uint8_t v = prefs.getUChar("cycle", fallback);
+    prefs.end();
+    return v;
+  }
+  void setBootCycles(uint8_t n) {
+    prefs.begin("boot", false);
+    prefs.putUChar("cycle", n);
+    prefs.end();
+  }
+
   // ── Reset ──────────────────────────────────
   void resetWifi()      { clearWifi(); }
   void resetCloud()     { clearNamespace("cloud"); }

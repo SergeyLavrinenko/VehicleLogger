@@ -138,7 +138,7 @@ static void enterWorkingMode() {
   Serial.println(F("[BOOT] Working mode (telemetry)"));
 
   if (!WifiManager::connectFromNvs(20000)) {
-    Serial.println("[WORK] WiFi connect failed — ждём в loop()");
+    Serial.println("[WORK] WiFi connect failed — ждём в loop() (auto-fallback через ~90 сек)");
     return;
   }
 
@@ -174,6 +174,22 @@ void setup() {
   printBanner();
 
   NvsStore::begin();
+
+  // Тройной power-cycle reset: если устройство включается третий раз подряд
+  // (каждый раз короче 10 секунд аптайма) — стираем wifi+cloud, оставляем factory.
+  // В loop() через 10 сек после старта счётчик сбрасывается в 0, так что
+  // обычная перезагрузка не триггерит сброс.
+  uint8_t cycles = (uint8_t)(NvsStore::getBootCycles(0) + 1);
+  NvsStore::setBootCycles(cycles);
+  Serial.printf("[BOOT] power-cycle counter = %u/3\n", cycles);
+  if (cycles >= 3) {
+    Serial.println(F("[BOOT] >>> 3x POWER-CYCLE — factory reset of wifi+cloud <<<"));
+    NvsStore::factoryReset();
+    NvsStore::setBootCycles(0);
+    delay(1500);
+    ESP.restart();
+  }
+
   NvsStore::bringUpFactoryDefaults();
 
   GpsModule::begin();   // GPS поднимаем сразу — фикс может занять минуты
@@ -201,6 +217,14 @@ void setup() {
 }
 
 void loop() {
+  // Тройной reset: счётчик сбрасываем после 10 сек uptime,
+  // чтобы обычная перезагрузка не считалась как один из трёх.
+  static bool cyclesResetDone = false;
+  if (!cyclesResetDone && millis() > 10000) {
+    NvsStore::setBootCycles(0);
+    cyclesResetDone = true;
+  }
+
   if (!g_workingReady) {
     // WiFi не поднялся при старте — пробуем повторно.
     if (WifiManager::connectFromNvs(15000)) {
@@ -212,12 +236,26 @@ void loop() {
       g_workingReady = true;
       Serial.println("[WORK] late-ready");
     } else {
+      if (WifiManager::shouldFallbackToSoftAp()) {
+        Serial.println(F("[WIFI] auto-fallback: WiFi не поднялся за 90 сек, "
+                          "стираем wifi-креды и перезагружаемся в SoftAP"));
+        NvsStore::resetWifi();
+        delay(1500);
+        ESP.restart();
+      }
       delay(5000);
       return;
     }
   }
 
   WifiManager::ensureConnected();
+  if (WifiManager::shouldFallbackToSoftAp()) {
+    Serial.println(F("[WIFI] auto-fallback: связь потеряна > 5 мин — "
+                       "стираем wifi-креды, перезагружаемся в SoftAP"));
+    NvsStore::resetWifi();
+    delay(1500);
+    ESP.restart();
+  }
   CanModule::tick();
   GpsModule::tick();
   MqttClient::loop();
