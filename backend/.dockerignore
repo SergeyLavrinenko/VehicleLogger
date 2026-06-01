@@ -1,0 +1,10 @@
+bin/
+obj/
+publish/
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.user
+appsettings.Development.json
+appsettings.Local.json

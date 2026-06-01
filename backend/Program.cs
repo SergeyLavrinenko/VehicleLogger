@@ -19,8 +19,13 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
 builder.Services.AddSingleton<JwtIssuer>();
 builder.Services.AddHttpClient<OllamaClient>();
 
-var jwtKey      = builder.Configuration["Jwt:Key"]      ?? "";
-var jwtIssuer   = builder.Configuration["Jwt:Issuer"]   ?? "VehicleLogger";
+// Клиент для отправки уведомлений водителям через HTTP-сервер Telegram-бота.
+// Короткий таймаут: если бот недоступен, приём телеметрии не должен зависать.
+builder.Services.AddHttpClient<TelegramNotifier>(c =>
+    c.Timeout = TimeSpan.FromSeconds(5));
+
+var jwtKey = builder.Configuration["Jwt:Key"] ?? "";
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "VehicleLogger";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "VehicleLogger.Api";
 
 builder.Services
@@ -29,20 +34,20 @@ builder.Services
     {
         opt.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer           = true,
-            ValidateAudience         = true,
-            ValidateLifetime         = true,
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer              = jwtIssuer,
-            ValidAudience            = jwtAudience,
-            IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-            ClockSkew                = TimeSpan.FromMinutes(2)
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            ClockSkew = TimeSpan.FromMinutes(2)
         };
     });
 
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("admin",  p => p.RequireRole("admin"));
+    options.AddPolicy("admin", p => p.RequireRole("admin"));
     options.AddPolicy("driver", p => p.RequireRole("driver"));
 });
 
@@ -65,7 +70,7 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
     KnownNetworks = { },
-    KnownProxies  = { }
+    KnownProxies = { }
 });
 
 app.UseCors();
@@ -88,5 +93,6 @@ app.MapDeviceListEndpoints();
 app.MapEnrollmentEndpoints();
 app.MapTenantEndpoints();
 app.MapAiSummaryEndpoints();
+app.MapDriverEndpoints();
 
 app.Run();
