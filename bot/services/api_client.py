@@ -50,7 +50,7 @@ class APIClient:
     async def get_alerts(telegram_id: int):
         async with httpx.AsyncClient(timeout=APIClient._timeout, verify=_VERIFY_TLS) as client:
             r = await client.get(
-                f"{BASE_API_URL}/alerts",
+                f"{BASE_API_URL}/api/alerts",
                 params={"telegramId": telegram_id},
             )
             r.raise_for_status()

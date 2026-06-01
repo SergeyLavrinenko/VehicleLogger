@@ -5,13 +5,12 @@ services:
     container_name: vl-backend
     environment:
       # Файл SQLite кладём в смонтированный volume — переживёт пересборку.
-      # Перебивает ConnectionStrings:Default из appsettings.json.
       - ConnectionStrings__Default=Data Source=/app/data/vehiclelogger.db
       - ASPNETCORE_ENVIRONMENT=Production
+      # Адрес HTTP-сервера уведомлений бота (бэкенд → бот).
+      - Telegram__NotifyUrl=http://bot:8081/send-message
+      - Telegram__NotifyKey=${BOT_NOTIFY_KEY}
       # Ключ Ollama и JWT уже зашиты в appsettings.json — ничего добавлять не нужно.
-      # При желании их можно переопределить здесь:
-      #   - Ollama__ApiKey=...
-      #   - Jwt__Key=...
     volumes:
       - vl-data:/app/data
     ports:
@@ -28,7 +27,7 @@ services:
       - "8080:80"            # веб-панель: http://localhost:8080
     restart: unless-stopped
 
-  # ---------- Telegram-бот (polling) ----------
+  # ---------- Telegram-бот (polling + сервер уведомлений) ----------
   bot:
     build: ./bot
     container_name: vl-bot
@@ -36,9 +35,13 @@ services:
       backend:
         condition: service_healthy   # ждём, пока /api/health ответит
     environment:
-      - BOT_TOKEN=${BOT_TOKEN}        # берётся из .env
-      - USE_MOCK=false                # ходим в реальный бэкенд, не в заглушку
+      - BOT_TOKEN=${BOT_TOKEN}             # берётся из .env
+      - USE_MOCK=false                     # ходим в реальный бэкенд, не в заглушку
       - BASE_API_URL=http://backend:8080   # имя сервиса в сети compose
+      - NOTIFY_PORT=8081                   # порт сервера уведомлений
+      - BOT_NOTIFY_KEY=${BOT_NOTIFY_KEY}   # общий секрет с бэкендом
+    expose:
+      - "8081"               # доступен другим контейнерам, наружу НЕ публикуется
     restart: unless-stopped
 
   # ---------- Симулятор устройства (фейковая телеметрия для демо) ----------
@@ -50,15 +53,11 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    # Шлём от имени засеянного устройства VL-A3F82B01 (Фура №1).
-    # dev-key-001 — его ApiKey из DbSeeder, совпадает из коробки.
     command:
       - "--url=http://backend:8080"
       - "--interval=5000"
       - "--device=VL-A3F82B01"
       - "--key=dev-key-001"
-    # stdin_open: иначе readline в sim.js ловит EOF и контейнер сразу выходит.
-    # tty: позволяет `docker attach vl-device-sim` и слать команды (anomaly overheat и т.п.).
     stdin_open: true
     tty: true
     restart: unless-stopped

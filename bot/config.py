@@ -18,3 +18,14 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://your-domain.com/api/telegram/web
 # Включить:  USE_MOCK=true python main_polling.py
 # Выключить: USE_MOCK=false python main_polling.py   (или просто не задавать)
 USE_MOCK = os.getenv("USE_MOCK", "true").lower() in ("1", "true", "yes", "on")
+
+# ── HTTP-сервер уведомлений (бэкенд → бот) ───────────────────────────────
+# В polling-режиме бот дополнительно поднимает маленький HTTP-сервер, чтобы
+# основной бэкенд мог присылать сообщения водителям (алерты по фуре).
+# Это внутренний сервис между контейнерами — наружу порт не публикуется.
+NOTIFY_HOST = os.getenv("NOTIFY_HOST", "0.0.0.0")
+NOTIFY_PORT = int(os.getenv("NOTIFY_PORT", "8081"))
+
+# Общий секрет между ботом и бэкендом для эндпоинта /send-message.
+# Если пусто — проверка ключа отключена.
+BOT_NOTIFY_KEY = os.getenv("BOT_NOTIFY_KEY", "")
