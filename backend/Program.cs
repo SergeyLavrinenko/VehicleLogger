@@ -88,5 +88,6 @@ app.MapDeviceListEndpoints();
 app.MapEnrollmentEndpoints();
 app.MapTenantEndpoints();
 app.MapAiSummaryEndpoints();
+app.MapDriverEndpoints();
 
 app.Run();

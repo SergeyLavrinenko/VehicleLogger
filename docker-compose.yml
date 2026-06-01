@@ -1,0 +1,67 @@
+services:
+  # ---------- .NET бэкенд ----------
+  backend:
+    build: ./backend
+    container_name: vl-backend
+    environment:
+      # Файл SQLite кладём в смонтированный volume — переживёт пересборку.
+      # Перебивает ConnectionStrings:Default из appsettings.json.
+      - ConnectionStrings__Default=Data Source=/app/data/vehiclelogger.db
+      - ASPNETCORE_ENVIRONMENT=Production
+      # Ключ Ollama и JWT уже зашиты в appsettings.json — ничего добавлять не нужно.
+      # При желании их можно переопределить здесь:
+      #   - Ollama__ApiKey=...
+      #   - Jwt__Key=...
+    volumes:
+      - vl-data:/app/data
+    ports:
+      - "5000:8080"          # прямой доступ к API с хоста (для device-sim, отладки)
+    restart: unless-stopped
+
+  # ---------- Vue фронтенд (nginx) ----------
+  frontend:
+    build: ./frontend
+    container_name: vl-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"            # веб-панель: http://localhost:8080
+    restart: unless-stopped
+
+  # ---------- Telegram-бот (polling) ----------
+  bot:
+    build: ./bot
+    container_name: vl-bot
+    depends_on:
+      backend:
+        condition: service_healthy   # ждём, пока /api/health ответит
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}        # берётся из .env
+      - USE_MOCK=false                # ходим в реальный бэкенд, не в заглушку
+      - BASE_API_URL=http://backend:8080   # имя сервиса в сети compose
+    restart: unless-stopped
+
+  # ---------- Симулятор устройства (фейковая телеметрия для демо) ----------
+  # Запускается ТОЛЬКО с флагом --profile demo, чтобы не слать фейк в проде.
+  device-sim:
+    build: ./tools/device-sim
+    container_name: vl-device-sim
+    profiles: ["demo"]
+    depends_on:
+      backend:
+        condition: service_healthy
+    # Шлём от имени засеянного устройства VL-A3F82B01 (Фура №1).
+    # dev-key-001 — его ApiKey из DbSeeder, совпадает из коробки.
+    command:
+      - "--url=http://backend:8080"
+      - "--interval=5000"
+      - "--device=VL-A3F82B01"
+      - "--key=dev-key-001"
+    # stdin_open: иначе readline в sim.js ловит EOF и контейнер сразу выходит.
+    # tty: позволяет `docker attach vl-device-sim` и слать команды (anomaly overheat и т.п.).
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+volumes:
+  vl-data:
